@@ -3,7 +3,9 @@ import json
 import re
 import logging
 import tiktoken
+import base64
 from typing import List
+from pathlib import Path
 from dotenv import load_dotenv
 
 from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -15,6 +17,8 @@ from transformers import AutoTokenizer
 from docling.chunking import HybridChunker
 from langchain.schema import Document, HumanMessage
 from langchain_openai import ChatOpenAI
+
+from .base import BaseDocumentConverter
 
 
 # === Logging configuration ===
@@ -30,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class DocumentProcessor:
+class DocumentProcessor(BaseDocumentConverter):
     """
     A class for converting, chunking, and analyzing PDF documents using Docling and OpenAI.
     Extracts text and image data and prepares them as LangChain documents for further processing.
@@ -53,21 +57,12 @@ class DocumentProcessor:
             llm_max_tokens: Maximum token limit for LLM inputs.
         """
         load_dotenv()
+        
+        # Initialize the base class
+        super().__init__(embedding_model=embed_model_id, max_tokens=max_tokens)
 
-        self.embed_model_id = embed_model_id
-        self.max_tokens = max_tokens
         self.llm_model_name = llm_model_name
         self.llm_max_tokens = llm_max_tokens
-
-        self.tokenizer = HuggingFaceTokenizer(
-            tokenizer=AutoTokenizer.from_pretrained(embed_model_id),
-            max_tokens=max_tokens,
-        )
-
-        self.chunker = HybridChunker(
-            tokenizer=self.tokenizer,
-            merge_peers=True,
-        )
 
         self.llm = ChatOpenAI(
             model_name=llm_model_name,
@@ -90,61 +85,7 @@ Markdown content:
 {markdown_content}
 """
 
-    def convert_document(self, source_path: str):
-        """
-        Convert a PDF file into a structured Docling document.
 
-        Args:
-            source_path: Path to the input PDF file.
-
-        Returns:
-            A Docling document object.
-        """
-        logger.info(f"Converting document: {source_path}")
-        pipeline_options = PdfPipelineOptions(
-            generate_picture_images=True,
-            do_formula_enrichment=True,
-            image_scale=2
-        )
-        converter = DocumentConverter(
-            format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
-        )
-        return converter.convert(source=source_path).document
-
-    def chunk_document(self, document) -> List[Document]:
-        """
-        Split a Docling document into smaller text chunks.
-
-        Args:
-            document: A Docling document object.
-
-        Returns:
-            A list of LangChain Document objects containing text chunks.
-        """
-        logger.info("Chunking document into smaller pieces...")
-        chunks = list(self.chunker.chunk(dl_doc=document))
-        docs = []
-
-        for chunk in chunks:
-            content = self.chunker.contextualize(chunk=chunk)
-            filepath = chunk.meta.origin.filename
-            filename = os.path.splitext(filepath)[0]
-            page_start = chunk.meta.doc_items[0].prov[0].page_no
-            page_end = chunk.meta.doc_items[-1].prov[-1].page_no
-
-            docs.append(
-                Document(
-                    page_content=content,
-                    metadata={
-                        "path": filepath,
-                        "pages": [page_start, page_end],
-                        "type": "text",
-                        "name": filename,
-                    },
-                )
-            )
-        logger.info(f"Created {len(docs)} text chunks.")
-        return docs
 
     def save_as_markdown(self, document, output_path: str = "output.md") -> str:
         """
@@ -254,8 +195,8 @@ Markdown content:
         Returns:
             A list of all LangChain Document objects (text chunks and image descriptions).
         """
-        document = self.convert_document(source_path)
-        text_docs = self.chunk_document(document)
+        document = super().convert_document(source_path)
+        text_docs = super().chunk_document(document)
         markdown = self.save_as_markdown(document, output_md_path)
         image_docs = self.extract_images_from_markdown(markdown)
         all_docs = text_docs + image_docs
@@ -265,3 +206,98 @@ Markdown content:
             f"{len(image_docs)} image descriptions, total {len(all_docs)} documents."
         )
         return all_docs
+    
+
+class GenericProcessor(BaseDocumentConverter):
+    """A generic processor to handle various file types and convert them into Document objects."""
+
+    IMG_EXTENSION = [".png", ".jpg", ".jpeg"]
+    FILE_EXTENSION = [".md", ".csv"]
+
+    def __init__(self, 
+                 llm_model: str = "gpt-4.1-mini",
+                 embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+                 max_tokens: int = 4096):
+        super().__init__(embedding_model=embedding_model, max_tokens=max_tokens)
+        
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+        if not self.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY environment variable not set.")
+        self.llm = ChatOpenAI(model=llm_model, openai_api_key=self.OPENAI_API_KEY)
+
+    @staticmethod
+    def _file_to_base64(path: str) -> str:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
+    def _image_to_document(self, base64_image: str, prompt="Describe the following image.", source=None) -> Document:
+        from langchain.schema import HumanMessage
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+            ]
+        )
+        response = self.llm.invoke([message]).content
+        return Document(page_content=response, metadata={"source": source})
+
+    def load_document(self, path: str):
+        """Load document using standard Docling pipeline."""
+        document = self.convert_document(path)
+        return self.chunk_document(document)
+
+    def text2markdown(self, path: str, output_dir: str = "outputs") -> str:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = f.read().splitlines()
+        md_path = output_dir / Path(path).with_suffix('.md').name
+        md_path.write_text("\n".join(lines), encoding='utf-8')
+
+        return str(md_path)
+
+
+    def image2document(self, path: str, context: str = None):
+        prompt = f"Describe the image knowing that it is connected to the following context: {context}" if context else "Describe the following image."
+        return self._image_to_document(self._file_to_base64(path), prompt=prompt, source=path)
+
+    def pdf2documents(self, path: str, output_dir: str = "outputs", zoom: int = 2):
+        import fitz
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        pdf = fitz.open(path)
+        docs = []
+
+        for i, page in enumerate(pdf, start=1):
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+            img_base64 = base64.b64encode(pix.tobytes("png")).decode('utf-8')
+            doc = self._image_to_document(img_base64, prompt="Convert this PDF page to Markdown.", source=path)
+            doc.page_content = f"# Page {i}\n\n{doc.page_content}"
+            doc.metadata["page"] = i
+            docs.append(doc)
+
+        pdf.close()
+        return docs
+
+    def convert(self, path: str, output_dir: str = "outputs"):
+        ext = Path(path).suffix.lower()
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if ext == ".txt":
+            md_path = self.text2markdown(path, output_dir=str(output_dir))
+            return self.load_document(md_path)
+        elif ext in self.FILE_EXTENSION:
+            return self.load_document(path)
+        elif ext in self.IMG_EXTENSION:
+            return [self.image2document(path)]
+        elif ext == ".pdf":
+            return self.pdf2documents(path, output_dir=str(output_dir))
+        else:
+            raise ValueError(f"Unsupported file format: {ext}")        
+        
+
+
+
+
+
