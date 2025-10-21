@@ -174,6 +174,7 @@ Markdown content:
                     "pages": None,
                     "type": "image",
                     "name": img.get("name"),
+                    "namespace": "CaseDoneDemo", # Devi usare lo stesso quando crei una instance di MilvusStore (agent_rag)
                 },
             )
             for img in all_images
