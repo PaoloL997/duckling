@@ -91,6 +91,7 @@ class BaseDocumentConverter:
                         "pages": [page_start, page_end],
                         "type": "text",
                         "name": filename,
+                        "namespace": "CaseDoneDemo" # Devi usare lo stesso quando crei una instance di MilvusStore (agent_rag)
                     },
                 )
             )
