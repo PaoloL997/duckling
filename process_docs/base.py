@@ -88,7 +88,8 @@ class BaseDocumentConverter:
                     page_content=content,
                     metadata={
                         "path": filepath,
-                        "pages": [page_start, page_end],
+                        "page_start": str(page_start),
+                        "page_end": str(page_end),
                         "type": "text",
                         "name": filename,
                         "namespace": "CaseDoneDemo" # Devi usare lo stesso quando crei una instance di MilvusStore (agent_rag)
