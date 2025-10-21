@@ -171,6 +171,8 @@ Markdown content:
                 page_content=img["description"],
                 metadata={
                     "path": img.get("path"),
+                    "page_start": None,
+                    "page_end": None,
                     "type": "image",
                     "name": img.get("name"),
                     "namespace": "CaseDoneDemo", # Devi usare lo stesso quando crei una instance di MilvusStore (agent_rag)
