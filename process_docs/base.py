@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from typing import List
+from pathlib import Path
 
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from transformers import AutoTokenizer
@@ -79,15 +80,16 @@ class BaseDocumentConverter:
         for chunk in chunks:
             content = self.chunker.contextualize(chunk=chunk)
             filepath = chunk.meta.origin.filename
-            filename = os.path.splitext(filepath)[0]
+            filename = Path(filepath).name
             page_start = chunk.meta.doc_items[0].prov[0].page_no
             page_end = chunk.meta.doc_items[-1].prov[-1].page_no
 
+            relative_path = str((Path("media") / Path(filename).stem / filename).as_posix())
             docs.append(
                 Document(
                     page_content=content,
                     metadata={
-                        "path": filepath,
+                        "path": relative_path,
                         "page_start": str(page_start),
                         "page_end": str(page_end),
                         "type": "text",

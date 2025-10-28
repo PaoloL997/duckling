@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import re
 import logging
 import tiktoken
@@ -8,13 +9,7 @@ from typing import List
 from pathlib import Path
 from dotenv import load_dotenv
 
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.base_models import InputFormat
-from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import ImageRefMode
-from transformers import AutoTokenizer
-from docling.chunking import HybridChunker
 from langchain.schema import Document, HumanMessage
 from langchain_openai import ChatOpenAI
 
@@ -84,78 +79,33 @@ Output must be a single valid JSON array.
 Markdown content:
 {markdown_content}
 """
-
-
-
-    def save_as_markdown(self, document, output_path: str = "output.md") -> str:
-        """
-        Export a Docling document as markdown.
-
-        Args:
-            document: The Docling document object.
-            output_path: Path to save the generated markdown file.
-
-        Returns:
-            The markdown content as a string.
-        """
-        logger.info(f"Saving document as markdown to {output_path}")
+    def save_as_markdown(self, document, md_filepath: Path, artifacts_path: Path):
         document.save_as_markdown(
-            filename=output_path,
+            filename=str(md_filepath),
             image_mode=ImageRefMode.REFERENCED,
+            artifacts_dir=Path("artifacts"), # Crea una dir all'interno di media/filename
             include_annotations=False,
         )
-        with open(output_path, "r", encoding="utf-8") as f:
-            return f.read()
+        return md_filepath
 
-    def split_markdown_for_llm(self, markdown: str) -> List[str]:
-        """
-        Split markdown content into LLM-compatible chunks based on token limits.
+    def copy_source_file(self, filepath: str, source_path: Path):
+        shutil.copy2(filepath, source_path / Path(filepath).name)
 
-        Args:
-            markdown: The complete markdown text.
-
-        Returns:
-            A list of markdown chunks within token limits.
-        """
+    def split_markdown_for_llm(self, markdown: str) -> list:
         encoding = tiktoken.get_encoding("o200k_base")
         tokens = encoding.encode(markdown)
-        chunks = []
-        for i in range(0, len(tokens), self.llm_max_tokens):
-            chunks.append(encoding.decode(tokens[i:i + self.llm_max_tokens]))
-        return chunks
+        return [encoding.decode(tokens[i:i + self.llm_max_tokens]) for i in range(0, len(tokens), self.llm_max_tokens)]
 
     def clean_json_response(self, content: str) -> str:
-        """
-        Clean a raw JSON string returned by the LLM.
-
-        Args:
-            content: The raw LLM response.
-
-        Returns:
-            A cleaned JSON string ready for parsing.
-        """
         content = re.sub(r'```json\s*', '', content)
         content = re.sub(r'```\s*$', '', content)
         return content.strip()
 
-    def extract_images_from_markdown(self, markdown: str) -> List[Document]:
-        """
-        Extract image data from markdown using an LLM.
-
-        Args:
-            markdown: Markdown text content.
-
-        Returns:
-            A list of LangChain Document objects describing the images.
-        """
-        logger.info("Extracting image data from markdown...")
-        text_chunks = self.split_markdown_for_llm(markdown)
+    def extract_image_descriptions(self, chunks: list) -> list:
         all_images = []
-
-        for i, chunk in enumerate(text_chunks, start=1):
+        for i, chunk in enumerate(chunks, start=1):
             query = self.image_prompt.format(markdown_content=chunk)
             response = self.llm.invoke([HumanMessage(content=query)])
-
             try:
                 cleaned = self.clean_json_response(response.content)
                 chunk_images = json.loads(cleaned)
@@ -165,25 +115,33 @@ Markdown content:
                     logger.warning(f"Chunk {i} did not return a list.")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON from chunk {i}: {e}")
-
-        img_docs = [
-            Document(
-                page_content=img["description"],
-                metadata={
-                    "path": img.get("path"),
-                    "page_start": "N/A",
-                    "page_end": "N/A",
-                    "type": "image",
-                    "name": img.get("name"),
-                    "namespace": "CaseDoneDemo", # Devi usare lo stesso quando crei una instance di MilvusStore (agent_rag)
-                },
+        return all_images
+    
+    def create_image_documents(self, all_images: list, filepath: str) -> list:
+        img_docs = []
+        for img in all_images:
+            original_path = img.get("path", "")
+            if original_path:
+                image_name = Path(original_path).name
+                relative_path = (Path("media") / Path(filepath).stem / "artifacts" / image_name).as_posix()
+            else:
+                relative_path = ""
+            img_docs.append(
+                Document(
+                    page_content=img["description"],
+                    metadata={
+                        "path": relative_path,
+                        "page_start": "N/A",
+                        "page_end": "N/A",
+                        "type": "image",
+                        "name": img.get("name"),
+                        "namespace": "CaseDoneDemo",
+                    },
+                )
             )
-            for img in all_images
-        ]
-        logger.info(f"Extracted {len(img_docs)} image descriptions.")
         return img_docs
 
-    def process(self, source_path: str, output_md_path: str = "output.md"):
+    def process(self, filepath: str):
         """
         Run the complete document processing pipeline:
         1. Convert PDF to a structured Docling document.
@@ -192,17 +150,32 @@ Markdown content:
         4. Extract image descriptions using an LLM.
 
         Args:
-            source_path: Path to the input PDF file.
-            output_md_path: Path to save the markdown output.
+            filepath: Path to the input PDF file.
         Returns:
             A list of all LangChain Document objects (text chunks and image descriptions).
         """
-        document = super().convert_document(source_path)
+        document = super().convert_document(filepath)
         text_docs = super().chunk_document(document)
-        markdown = self.save_as_markdown(document, output_md_path)
-        image_docs = self.extract_images_from_markdown(markdown)
-        all_docs = text_docs + image_docs
+        # Setup paths
+        root_path = Path("media")
+        root_path.mkdir(exist_ok=True)
+        source_path = root_path / Path(filepath).stem
+        source_path.mkdir(exist_ok=True)
+        artifacts_path = source_path / "artifacts"
+        artifacts_path.mkdir(exist_ok=True)
 
+        self.copy_source_file(filepath, source_path)
+        md_filepath = source_path / f"{Path(filepath).stem}.md"
+        self.save_as_markdown(document, md_filepath, artifacts_path)
+
+        with open(md_filepath, "r", encoding="utf-8") as f:
+            markdown_content = f.read()
+
+        llm_chunks = self.split_markdown_for_llm(markdown_content)
+        all_images = self.extract_image_descriptions(llm_chunks)
+        image_docs = self.create_image_documents(all_images, filepath)
+
+        all_docs = text_docs + image_docs
         logger.info(
             f"Processing complete: {len(text_docs)} text chunks, "
             f"{len(image_docs)} image descriptions, total {len(all_docs)} documents."
