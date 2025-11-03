@@ -56,7 +56,7 @@ class BaseDocumentConverter:
         pipeline_options = PdfPipelineOptions(
             generate_picture_images=True,
             do_formula_enrichment=True,
-            image_scale=2
+            image_scale=4
         )
         converter = DocumentConverter(
             format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
