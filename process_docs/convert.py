@@ -1,14 +1,12 @@
 import os
 import json
-import shutil
 import re
 import logging
 import tiktoken
 import base64
-from typing import List
 from pathlib import Path
 from dotenv import load_dotenv
-
+from docling.document_converter import DocumentConverter
 from docling_core.types.doc.document import ImageRefMode
 from langchain.schema import Document, HumanMessage
 from langchain_openai import ChatOpenAI
@@ -79,7 +77,7 @@ Output must be a single valid JSON array.
 Markdown content:
 {markdown_content}
 """
-    def save_as_markdown(self, document, md_filepath: Path, artifacts_path: Path):
+    def save_as_markdown(self, document, md_filepath: Path):
         document.save_as_markdown(
             filename=str(md_filepath),
             image_mode=ImageRefMode.REFERENCED,
@@ -87,9 +85,6 @@ Markdown content:
             include_annotations=False,
         )
         return md_filepath
-
-    def copy_source_file(self, filepath: str, source_path: Path):
-        shutil.copy2(filepath, source_path / Path(filepath).name)
 
     def split_markdown_for_llm(self, markdown: str) -> list:
         encoding = tiktoken.get_encoding("o200k_base")
@@ -166,7 +161,7 @@ Markdown content:
 
         self.copy_source_file(filepath, source_path)
         md_filepath = source_path / f"{Path(filepath).stem}.md"
-        self.save_as_markdown(document, md_filepath, artifacts_path)
+        self.save_as_markdown(document, md_filepath)
 
         with open(md_filepath, "r", encoding="utf-8") as f:
             markdown_content = f.read()
@@ -195,18 +190,23 @@ class GenericProcessor(BaseDocumentConverter):
                  max_tokens: int = 4096):
         super().__init__(embedding_model=embedding_model, max_tokens=max_tokens)
         
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        if not self.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY environment variable not set.")
-        self.llm = ChatOpenAI(model=llm_model, openai_api_key=self.OPENAI_API_KEY)
+        self.llm = ChatOpenAI(
+            model=llm_model,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
 
     @staticmethod
     def _file_to_base64(path: str) -> str:
+        """Convert a file to a base64-encoded string."""
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
 
-    def _image_to_document(self, base64_image: str, prompt="Describe the following image.", source=None) -> Document:
-        from langchain.schema import HumanMessage
+    def _describe_image(
+            self,
+            base64_image: str,
+            prompt: str,
+            ) -> Document:
+        # TODO: improve image prompt
         message = HumanMessage(
             content=[
                 {"type": "text", "text": prompt},
@@ -214,62 +214,76 @@ class GenericProcessor(BaseDocumentConverter):
             ]
         )
         response = self.llm.invoke([message]).content
-        return Document(page_content=response, metadata={"source": source})
+        return response
 
-    def load_document(self, path: str):
+    def load_pdf(self, path: str):
         """Load document using standard Docling pipeline."""
+        # Qui teoricamente già popola i chunks come vogliamo noi
         document = self.convert_document(path)
         return self.chunk_document(document)
 
-    def text2markdown(self, path: str, output_dir: str = "outputs") -> str:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+    def text2markdown(self, path: str, outpath: Path) -> str:
+        """Convert a plain text file to markdown format."""
+        output_path = outpath / f"{Path(path).stem}.md"
         with open(path, 'r', encoding='utf-8') as f:
             lines = f.read().splitlines()
-        md_path = output_dir / Path(path).with_suffix('.md').name
-        md_path.write_text("\n".join(lines), encoding='utf-8')
+        output_path.write_text("\n".join(lines), encoding='utf-8')
+        return str(output_path)
+    
+    def load_generic(self, path: str):
+        converter = DocumentConverter()
+        return converter.convert(source=path).document
 
-        return str(md_path)
+    def image2document(self, path: str):
+        prompt = """
+        Describe the image in detail. Explain what is visible, including the main subjects, their surroundings, and any relevant actions, 
+        objects, or features. Mention colors, composition, and general atmosphere if noticeable. If any measurements, dimensions, scale
+        indicators, abbreviations, symbols, numbers, or text appear in the image, include them accurately in the description. Focus on
+        providing a clear, precise, and complete account of everything observable in the image.
+        """
+        response = self._describe_image(self._file_to_base64(path), prompt=prompt)
+        relative_path = (Path("media") / Path(path).name).as_posix()
+        return Document(
+            page_content=response,
+            metadata={
+                "path": relative_path,
+                "page_start": "N/A",
+                "page_end": "N/A",
+                "type": "image",
+                "name": Path(path).name,
+                "namespace": "CaseDoneDemo",
+            }
+        )
 
+    def convert(self, filepath: str):
 
-    def image2document(self, path: str, context: str = None):
-        prompt = f"Describe the image knowing that it is connected to the following context: {context}" if context else "Describe the following image."
-        return self._image_to_document(self._file_to_base64(path), prompt=prompt, source=path)
-
-    def pdf2documents(self, path: str, output_dir: str = "outputs", zoom: int = 2):
-        import fitz
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        pdf = fitz.open(path)
-        docs = []
-
-        for i, page in enumerate(pdf, start=1):
-            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
-            img_base64 = base64.b64encode(pix.tobytes("png")).decode('utf-8')
-            doc = self._image_to_document(img_base64, prompt="Convert this PDF page to Markdown.", source=path)
-            doc.page_content = f"# Page {i}\n\n{doc.page_content}"
-            doc.metadata["page"] = i
-            docs.append(doc)
-
-        pdf.close()
-        return docs
-
-    def convert(self, path: str, output_dir: str = "outputs"):
-        ext = Path(path).suffix.lower()
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        if ext == ".txt":
-            md_path = self.text2markdown(path, output_dir=str(output_dir))
-            return self.load_document(md_path)
-        elif ext in self.FILE_EXTENSION:
-            return self.load_document(path)
-        elif ext in self.IMG_EXTENSION:
-            return [self.image2document(path)]
-        elif ext == ".pdf":
-            return self.pdf2documents(path, output_dir=str(output_dir))
+        ext = Path(filepath).suffix.lower()
+        if ext == ".pdf":
+            processor = DocumentProcessor()
+            return processor.process(filepath)
         else:
-            raise ValueError(f"Unsupported file format: {ext}")        
+            root_path = Path("media")
+            root_path.mkdir(exist_ok=True)
+            source_path = root_path / Path(filepath).stem
+            source_path.mkdir(exist_ok=True)
+            artifacts_path = source_path / "artifacts"
+            artifacts_path.mkdir(exist_ok=True)
+
+            new_filepath = source_path / Path(filepath).name
+
+            if ext == ".txt":
+                self.copy_source_file(filepath, source_path)
+                md_path = self.text2markdown(new_filepath, outpath=source_path)
+                return self.load_document(md_path)
+            elif ext in self.IMG_EXTENSION:
+                self.copy_source_file(filepath, source_path)
+                return [self.image2document(new_filepath)]
+            elif ext in self.FILE_EXTENSION:
+                self.copy_source_file(filepath, source_path)
+                document = self.load_generic(new_filepath)
+                return self.chunk_document(document)
+            else:
+                raise ValueError(f"Unsupported file format: {ext}")        
         
 
 

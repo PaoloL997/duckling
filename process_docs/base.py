@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from dotenv import load_dotenv
 from typing import List
@@ -63,7 +64,9 @@ class BaseDocumentConverter:
         )
         return converter.convert(source=source_path).document
     
-
+    def copy_source_file(self, filepath: str, source_path: Path):
+        shutil.copy2(filepath, source_path / Path(filepath).name)
+    
     def chunk_document(self, document) -> List[Document]:
         """
         Split a Docling document into smaller text chunks.
@@ -81,8 +84,12 @@ class BaseDocumentConverter:
             content = self.chunker.contextualize(chunk=chunk)
             filepath = chunk.meta.origin.filename
             filename = Path(filepath).name
-            page_start = chunk.meta.doc_items[0].prov[0].page_no
-            page_end = chunk.meta.doc_items[-1].prov[-1].page_no
+            try:
+                page_start = chunk.meta.doc_items[0].prov[0].page_no
+                page_end = chunk.meta.doc_items[-1].prov[-1].page_no
+            except Exception:
+                page_start = "N/A"
+                page_end = "N/A"
 
             relative_path = str((Path("media") / Path(filename).stem / filename).as_posix())
             docs.append(
