@@ -242,7 +242,7 @@ class GenericProcessor(BaseDocumentConverter):
         providing a clear, precise, and complete account of everything observable in the image.
         """
         response = self._describe_image(self._file_to_base64(path), prompt=prompt)
-        relative_path = (Path("media") / Path(path).name).as_posix()
+        relative_path = (Path("media") / Path(path).stem / Path(path).name).as_posix()
         return Document(
             page_content=response,
             metadata={
