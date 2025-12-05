@@ -1,0 +1,25 @@
+models:
+  embedding: text-embedding-3-small
+  llm: gpt-4.1-nano
+  tokenizer: sentence-transformers/all-MiniLM-L6-v2
+
+prompts:
+  retrive_image_description: |
+    You are given the following markdown content extracted from a PDF document. 
+    Your task is to identify all images present in the markdown.
+
+    For each image, create a JSON object with the following fields:
+    - "path": the full path or URL of the image as it appears in the markdown
+    - "name": the name or identifier used to reference this image in the text (e.g., "Figure 1", "Diagram A", etc.)
+    - "description": a detailed, reasoned explanation of what the image represents based on its surrounding context and purpose.
+
+    IMPORTANT: If the same image appears multiple times, create only one entry with a merged, comprehensive description.
+
+    Output must be a single valid JSON array.
+    Markdown content:
+    {markdown_content}
+  describe_image: |
+    Describe the image in detail. Explain what is visible, including the main subjects, their surroundings, and any relevant actions, 
+    objects, or features. Mention colors, composition, and general atmosphere if noticeable. If any measurements, dimensions, scale
+    indicators, abbreviations, symbols, numbers, or text appear in the image, include them accurately in the description. Focus on
+    providing a clear, precise, and complete account of everything observable in the image.

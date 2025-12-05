@@ -200,3 +200,5 @@ Thumbs.db
 # Test artifacts
 test_output/
 test_artifacts/
+
+*.lock
