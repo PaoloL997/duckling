@@ -6,11 +6,12 @@ from typing import List
 from pathlib import Path
 
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from transformers import AutoTokenizer
 from docling.chunking import HybridChunker
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractOcrOptions
 from langchain.schema import Document
 
 
@@ -59,6 +60,10 @@ class BaseDocumentConverter:
             do_formula_enrichment=True,
             image_scale=4
         )
+        accel_opts = AcceleratorOptions(device=AcceleratorDevice.CUDA, num_threads=8)
+        pipeline_options.accelerator_options = accel_opts
+        pipeline_options.do_ocr = True
+        #pipeline_options.ocr_options = TesseractOcrOptions()
         converter = DocumentConverter(
             format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
         )
