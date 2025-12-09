@@ -202,3 +202,5 @@ test_output/
 test_artifacts/
 
 *.lock
+*.pdf
+*.ipynb

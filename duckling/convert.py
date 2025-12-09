@@ -26,7 +26,7 @@ load_dotenv()
 cfg = Config()
 
 
-class DocumentProcessor(BaseDocumentConverter):
+class DucklingPDF(BaseDocumentConverter):
     """Processes PDF documents into chunked text and image descriptions.
 
     Extends BaseDocumentConverter to handle PDF conversion, text chunking,
@@ -219,7 +219,7 @@ class DocumentProcessor(BaseDocumentConverter):
         return all_docs
 
 
-class GenericProcessor(BaseDocumentConverter):
+class DucklingGeneric(BaseDocumentConverter):
     """A generic processor to handle various file types and convert them into Document objects."""
 
     IMG_EXTENSION = [".png", ".jpg", ".jpeg"]
@@ -360,7 +360,7 @@ class GenericProcessor(BaseDocumentConverter):
         """
         ext = Path(filepath).suffix.lower()
         if ext == ".pdf":
-            processor = DocumentProcessor()
+            processor = DucklingPDF()
             return processor.process(filepath)
         root_path = Path("media")
         root_path.mkdir(exist_ok=True)

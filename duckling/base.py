@@ -44,11 +44,11 @@ class BaseDocumentConverter:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
             namespace: Namespace identifier for documents. Defaults to "namespace".
         """
-        self.embedding_model = cfg.models("embedding_model")
+        self.embedding_model = cfg.models("embedding")
         self.max_tokens = max_tokens
         self.namespace = namespace
 
-        self.embeddings = OpenAIEmbeddings(model=self.embedding_model.values())
+        self.embeddings = OpenAIEmbeddings(model=self.embedding_model)
 
         self.tokenizer = HuggingFaceTokenizer(
             tokenizer=AutoTokenizer.from_pretrained(cfg.models("tokenizer")),
