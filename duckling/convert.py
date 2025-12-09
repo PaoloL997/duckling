@@ -134,12 +134,15 @@ class DocumentProcessor(BaseDocumentConverter):
                 logger.error("Failed to parse JSON from chunk %d: %s", i, e)
         return all_images
 
-    def create_image_documents(self, all_images: list, filepath: str) -> list:
+    def create_image_documents(
+        self, all_images: list, filepath: str, namespace: str = "namespace"
+    ) -> list:
         """Convert extracted image data into LangChain Document objects.
 
         Args:
             all_images: List of image metadata dictionaries.
             filepath: Original document filepath for path construction.
+            namespace: Namespace to assign in metadata. Defaults to "namespace".
 
         Returns:
             list: List of LangChain Document objects with image metadata.
@@ -163,7 +166,7 @@ class DocumentProcessor(BaseDocumentConverter):
                         "page_end": "N/A",
                         "type": "image",
                         "name": img.get("name"),
-                        "namespace": "CaseDoneDemo",
+                        "namespace": namespace,
                     },
                 )
             )
@@ -318,7 +321,7 @@ class GenericProcessor(BaseDocumentConverter):
         converter = DocumentConverter()
         return converter.convert(source=path).document
 
-    def image2document(self, path: str):
+    def image2document(self, path: str, namespace: str = "namespace") -> Document:
         """Convert an image file to a Document object.
 
         Args:
@@ -339,7 +342,7 @@ class GenericProcessor(BaseDocumentConverter):
                 "page_end": "N/A",
                 "type": "image",
                 "name": Path(path).name,
-                "namespace": "CaseDoneDemo",
+                "namespace": namespace,
             },
         )
 
