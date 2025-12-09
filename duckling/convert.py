@@ -37,6 +37,7 @@ class DucklingPDF(BaseDocumentConverter):
         self,
         max_tokens: int = 4096,
         llm_max_tokens: int = 900_000,
+        namespace: str = "namespace",
         config: Config | None = None,
     ):
         """Initialize the document processor.
@@ -47,8 +48,9 @@ class DucklingPDF(BaseDocumentConverter):
             config: Optional Config object for configuration. Defaults to None.
         """
         load_dotenv()
+        self.namespace = namespace
         self.config = config if config else cfg
-        super().__init__(max_tokens=max_tokens, config=config)
+        super().__init__(max_tokens=max_tokens, namespace=namespace, config=config)
         self.llm_model_name = self.config.models("llm")
         self.llm_max_tokens = llm_max_tokens
 
@@ -137,15 +139,12 @@ class DucklingPDF(BaseDocumentConverter):
                 logger.error("Failed to parse JSON from chunk %d: %s", i, e)
         return all_images
 
-    def create_image_documents(
-        self, all_images: list, filepath: str, namespace: str = "namespace"
-    ) -> list:
+    def create_image_documents(self, all_images: list, filepath: str) -> list:
         """Convert extracted image data into LangChain Document objects.
 
         Args:
             all_images: List of image metadata dictionaries.
             filepath: Original document filepath for path construction.
-            namespace: Namespace to assign in metadata. Defaults to "namespace".
 
         Returns:
             list: List of LangChain Document objects with image metadata.
@@ -169,7 +168,7 @@ class DucklingPDF(BaseDocumentConverter):
                         "page_end": "N/A",
                         "type": "image",
                         "name": img.get("name"),
-                        "namespace": namespace,
+                        "namespace": self.namespace,
                     },
                 )
             )
@@ -231,6 +230,7 @@ class DucklingGeneric(BaseDocumentConverter):
     def __init__(
         self,
         max_tokens: int = 4096,
+        namespace: str = "namespace",
         config: Config | None = None,
     ):
         """Initialize the GenericProcessor.
@@ -238,9 +238,10 @@ class DucklingGeneric(BaseDocumentConverter):
         Args:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
             config: Optional Config object for configuration. Defaults to None.
+            namespace: Namespace for document metadata. Defaults to "namespace".
         """
         self.config = config if config else cfg
-        super().__init__(max_tokens=max_tokens, config=self.config)
+        super().__init__(max_tokens=max_tokens, namespace=namespace, config=self.config)
         self.llm = ChatOpenAI(model=self.config.models("llm"))
 
     @staticmethod
@@ -327,7 +328,7 @@ class DucklingGeneric(BaseDocumentConverter):
         converter = DocumentConverter()
         return converter.convert(source=path).document
 
-    def image2document(self, path: str, namespace: str = "namespace") -> Document:
+    def image2document(self, path: str) -> Document:
         """Convert an image file to a Document object.
 
         Args:
@@ -348,7 +349,7 @@ class DucklingGeneric(BaseDocumentConverter):
                 "page_end": "N/A",
                 "type": "image",
                 "name": Path(path).name,
-                "namespace": namespace,
+                "namespace": self.namespace,
             },
         )
 
