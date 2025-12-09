@@ -204,3 +204,4 @@ test_artifacts/
 *.lock
 *.pdf
 *.ipynb
+media/

@@ -37,20 +37,23 @@ class DucklingPDF(BaseDocumentConverter):
         self,
         max_tokens: int = 4096,
         llm_max_tokens: int = 900_000,
+        config: Config | None = None,
     ):
         """Initialize the document processor.
 
         Args:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
             llm_max_tokens: Maximum token limit for LLM inputs. Defaults to 900000.
+            config: Optional Config object for configuration. Defaults to None.
         """
         load_dotenv()
-        super().__init__(max_tokens=max_tokens)
-        self.llm_model_name = cfg.models("llm")
+        self.config = config if config else cfg
+        super().__init__(max_tokens=max_tokens, config=config)
+        self.llm_model_name = self.config.models("llm")
         self.llm_max_tokens = llm_max_tokens
 
         self.llm = ChatOpenAI(model=self.llm_model_name)
-        self.image_prompt = cfg.prompts("retrive_image_description")
+        self.image_prompt = self.config.prompts("retrive_image_description")
 
     def save_as_markdown(self, document, md_filepath: Path):
         """Save a Docling document as markdown file with embedded images.
@@ -228,14 +231,17 @@ class DucklingGeneric(BaseDocumentConverter):
     def __init__(
         self,
         max_tokens: int = 4096,
+        config: Config | None = None,
     ):
         """Initialize the GenericProcessor.
 
         Args:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
+            config: Optional Config object for configuration. Defaults to None.
         """
-        super().__init__(max_tokens=max_tokens)
-        self.llm = ChatOpenAI(model=cfg.models("llm"))
+        self.config = config if config else cfg
+        super().__init__(max_tokens=max_tokens, config=self.config)
+        self.llm = ChatOpenAI(model=self.config.models("llm"))
 
     @staticmethod
     def _file_to_base64(path: str) -> str:
@@ -331,7 +337,7 @@ class DucklingGeneric(BaseDocumentConverter):
             Document: Document object with image description and metadata.
         """
         response = self._describe_image(
-            self._file_to_base64(path), prompt=cfg.prompts("describe_image")
+            self._file_to_base64(path), prompt=self.config.prompts("describe_image")
         )
         relative_path = (Path("media") / Path(path).stem / Path(path).name).as_posix()
         return Document(

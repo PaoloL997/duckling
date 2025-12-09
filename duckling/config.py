@@ -16,13 +16,21 @@ class Config:
     values with optional key-based access.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, path: str | None = None) -> None:
         """Initialize the Config class by loading config.yaml.
 
+        Args:
+            path: Optional path to the configuration file. If not provided,
+                        defaults to config.yaml in the module directory.
+
         Raises:
-            FileNotFoundError: If config.yaml is not found in the module directory.
+            FileNotFoundError: If the configuration file is not found.
         """
-        config_path = Path(__file__).parent / "config.yaml"
+        if path is None:
+            config_path = Path(__file__).parent / "config.yaml"
+        else:
+            config_path = Path(path)
+
         if not config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
         with open(config_path, "r", encoding="utf-8") as f:

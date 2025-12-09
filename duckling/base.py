@@ -37,21 +37,27 @@ class BaseDocumentConverter:
     documents into chunks using the HybridChunker strategy.
     """
 
-    def __init__(self, max_tokens: int = 4096, namespace: str = "namespace"):
+    def __init__(
+        self,
+        max_tokens: int = 4096,
+        namespace: str = "namespace",
+        config: Config | None = None,
+    ):
         """Initialize the BaseDocumentConverter.
 
         Args:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
             namespace: Namespace identifier for documents. Defaults to "namespace".
         """
-        self.embedding_model = cfg.models("embedding")
+        self.config = config if config else cfg
+        self.embedding_model = self.config.models("embedding")
         self.max_tokens = max_tokens
         self.namespace = namespace
 
         self.embeddings = OpenAIEmbeddings(model=self.embedding_model)
 
         self.tokenizer = HuggingFaceTokenizer(
-            tokenizer=AutoTokenizer.from_pretrained(cfg.models("tokenizer")),
+            tokenizer=AutoTokenizer.from_pretrained(self.config.models("tokenizer")),
             max_tokens=max_tokens,
         )
 
