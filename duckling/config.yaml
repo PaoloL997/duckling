@@ -1,5 +1,4 @@
 models:
-  embedding: text-embedding-3-small
   llm: gpt-4.1-nano
   tokenizer: sentence-transformers/all-MiniLM-L6-v2
 
