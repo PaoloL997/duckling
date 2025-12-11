@@ -18,7 +18,6 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling_core.types.doc import DoclingDocument
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from langchain.schema import Document
-from langchain_openai import OpenAIEmbeddings
 
 from dotenv import load_dotenv
 
@@ -53,8 +52,6 @@ class BaseDocumentConverter:
         self.embedding_model = self.config.models("embedding")
         self.max_tokens = max_tokens
         self.namespace = namespace
-
-        self.embeddings = OpenAIEmbeddings(model=self.embedding_model)
 
         self.tokenizer = HuggingFaceTokenizer(
             tokenizer=AutoTokenizer.from_pretrained(self.config.models("tokenizer")),
