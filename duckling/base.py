@@ -49,7 +49,6 @@ class BaseDocumentConverter:
             namespace: Namespace identifier for documents. Defaults to "namespace".
         """
         self.config = config if config else cfg
-        self.embedding_model = self.config.models("embedding")
         self.max_tokens = max_tokens
         self.namespace = namespace
 
