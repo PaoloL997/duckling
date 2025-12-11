@@ -17,7 +17,7 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling_core.types.doc import DoclingDocument
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from dotenv import load_dotenv
 

@@ -13,7 +13,8 @@ import tiktoken
 from dotenv import load_dotenv
 from docling.document_converter import DocumentConverter
 from docling_core.types.doc.document import ImageRefMode
-from langchain.schema import Document, HumanMessage
+from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
 from .base import BaseDocumentConverter
