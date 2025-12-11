@@ -39,18 +39,15 @@ class BaseDocumentConverter:
     def __init__(
         self,
         max_tokens: int = 4096,
-        namespace: str = "namespace",
         config: Config | None = None,
     ):
         """Initialize the BaseDocumentConverter.
 
         Args:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
-            namespace: Namespace identifier for documents. Defaults to "namespace".
         """
         self.config = config if config else cfg
         self.max_tokens = max_tokens
-        self.namespace = namespace
 
         self.tokenizer = HuggingFaceTokenizer(
             tokenizer=AutoTokenizer.from_pretrained(self.config.models("tokenizer")),
@@ -93,11 +90,14 @@ class BaseDocumentConverter:
         """
         shutil.copy2(filepath, source_path / Path(filepath).name)
 
-    def chunk_document(self, document: DoclingDocument) -> List[Document]:
+    def chunk_document(
+        self, document: DoclingDocument, namespace: str = "namespace"
+    ) -> List[Document]:
         """Split a Docling document into LangChain Document chunks.
 
         Args:
             document: A DoclingDocument object to chunk.
+            namespace: Namespace identifier for the documents.
 
         Returns:
             List[Document]: A list of LangChain Document objects with metadata.
@@ -140,7 +140,7 @@ class BaseDocumentConverter:
                         "page_end": str(page_end),
                         "type": "text",
                         "name": filename,
-                        "namespace": self.namespace,
+                        "namespace": namespace,
                     },
                 )
             )

@@ -38,7 +38,6 @@ class DucklingPDF(BaseDocumentConverter):
         self,
         max_tokens: int = 4096,
         llm_max_tokens: int = 900_000,
-        namespace: str = "namespace",
         config: Config | None = None,
     ):
         """Initialize the document processor.
@@ -49,9 +48,8 @@ class DucklingPDF(BaseDocumentConverter):
             config: Optional Config object for configuration. Defaults to None.
         """
         load_dotenv()
-        self.namespace = namespace
         self.config = config if config else cfg
-        super().__init__(max_tokens=max_tokens, namespace=namespace, config=config)
+        super().__init__(max_tokens=max_tokens, config=config)
         self.llm_model_name = self.config.models("llm")
         self.llm_max_tokens = llm_max_tokens
 
@@ -140,12 +138,15 @@ class DucklingPDF(BaseDocumentConverter):
                 logger.error("Failed to parse JSON from chunk %d: %s", i, e)
         return all_images
 
-    def create_image_documents(self, all_images: list, filepath: str) -> list:
+    def create_image_documents(
+        self, all_images: list, filepath: str, namespace: str = "namespace"
+    ) -> list:
         """Convert extracted image data into LangChain Document objects.
 
         Args:
             all_images: List of image metadata dictionaries.
             filepath: Original document filepath for path construction.
+            namespace: Namespace for document metadata. Defaults to "namespace".
 
         Returns:
             list: List of LangChain Document objects with image metadata.
@@ -169,13 +170,13 @@ class DucklingPDF(BaseDocumentConverter):
                         "page_end": "N/A",
                         "type": "image",
                         "name": img.get("name"),
-                        "namespace": self.namespace,
+                        "namespace": namespace,
                     },
                 )
             )
         return img_docs
 
-    def process(self, filepath: str):
+    def process(self, filepath: str, namespace: str = "namespace") -> list:
         """Run the complete document processing pipeline.
 
         Performs the following steps:
@@ -186,12 +187,13 @@ class DucklingPDF(BaseDocumentConverter):
 
         Args:
             filepath: Path to the input PDF file.
+            namespace: Namespace for document metadata. Defaults to "namespace".
 
         Returns:
             list: All LangChain Document objects (text chunks and image descriptions).
         """
         document = super().convert_document(filepath)
-        text_docs = super().chunk_document(document)
+        text_docs = super().chunk_document(document, namespace=namespace)
 
         root_path = Path("media")
         root_path.mkdir(exist_ok=True)
@@ -209,7 +211,7 @@ class DucklingPDF(BaseDocumentConverter):
 
         llm_chunks = self.split_markdown_for_llm(markdown_content)
         all_images = self.extract_image_descriptions(llm_chunks)
-        image_docs = self.create_image_documents(all_images, filepath)
+        image_docs = self.create_image_documents(all_images, filepath, namespace)
 
         all_docs = text_docs + image_docs
         logger.info(
@@ -231,7 +233,6 @@ class DucklingGeneric(BaseDocumentConverter):
     def __init__(
         self,
         max_tokens: int = 4096,
-        namespace: str = "namespace",
         config: Config | None = None,
     ):
         """Initialize the GenericProcessor.
@@ -239,10 +240,9 @@ class DucklingGeneric(BaseDocumentConverter):
         Args:
             max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
             config: Optional Config object for configuration. Defaults to None.
-            namespace: Namespace for document metadata. Defaults to "namespace".
         """
         self.config = config if config else cfg
-        super().__init__(max_tokens=max_tokens, namespace=namespace, config=self.config)
+        super().__init__(max_tokens=max_tokens, config=self.config)
         self.llm = ChatOpenAI(model=self.config.models("llm"))
 
     @staticmethod
@@ -329,12 +329,12 @@ class DucklingGeneric(BaseDocumentConverter):
         converter = DocumentConverter()
         return converter.convert(source=path).document
 
-    def image2document(self, path: str) -> Document:
+    def image2document(self, path: str, namespace: str = "namespace") -> Document:
         """Convert an image file to a Document object.
 
         Args:
             path: Path to the image file.
-
+            namespace: Namespace identifier for the document metadata.
         Returns:
             Document: Document object with image description and metadata.
         """
@@ -350,11 +350,11 @@ class DucklingGeneric(BaseDocumentConverter):
                 "page_end": "N/A",
                 "type": "image",
                 "name": Path(path).name,
-                "namespace": self.namespace,
+                "namespace": namespace,
             },
         )
 
-    def convert(self, filepath: str):
+    def convert(self, filepath: str, namespace: str = "namespace") -> list:
         """Convert any supported document type.
 
         Args:
@@ -369,7 +369,7 @@ class DucklingGeneric(BaseDocumentConverter):
         ext = Path(filepath).suffix.lower()
         if ext == ".pdf":
             processor = DucklingPDF()
-            return processor.process(filepath)
+            return processor.process(filepath=filepath, namespace=namespace)
         root_path = Path("media")
         root_path.mkdir(exist_ok=True)
         source_path = root_path / Path(filepath).stem
@@ -380,12 +380,12 @@ class DucklingGeneric(BaseDocumentConverter):
         if ext == ".txt":
             self.copy_source_file(filepath, source_path)
             md_path = self.text2markdown(str(new_filepath), outpath=source_path)
-            return self.chunk_document(self.load_generic(md_path))
+            return self.chunk_document(self.load_generic(md_path), namespace=namespace)
         if ext in self.IMG_EXTENSION:
             self.copy_source_file(filepath, source_path)
-            return [self.image2document(str(new_filepath))]
+            return [self.image2document(str(new_filepath), namespace=namespace)]
         if ext in self.FILE_EXTENSION:
             self.copy_source_file(filepath, source_path)
             document = self.load_generic(str(new_filepath))
-            return self.chunk_document(document)
+            return self.chunk_document(document, namespace=namespace)
         raise ValueError(f"Unsupported file format: {ext}")
