@@ -155,10 +155,12 @@ class DucklingPDF(BaseDocumentConverter):
     def refine_image_descriptions(self, images: list, source_path: str) -> list:
         refined_images = []
         prompt = self.config.prompts("image_refinement")
-        for image_description in images:
+
+        for i, image_description in enumerate(images, 1):
             path = image_description.get("path", "")
             complete_path = Path(source_path) / path
             description = image_description.get("description", "")
+
             base64_image = self._file_to_base64(complete_path)
             query = prompt.format(description=description)
             messages = HumanMessage(
@@ -171,8 +173,10 @@ class DucklingPDF(BaseDocumentConverter):
                 ]
             )
             response = self.llm.invoke([messages]).content
+
             if type(response) is str and response.strip().lower() == "false":
                 continue
+
             refined_images.append(
                 {
                     "path": path,

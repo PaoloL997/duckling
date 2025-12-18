@@ -35,36 +35,21 @@ prompts:
     providing a clear, precise, and complete account of everything observable in the image.
 
   image_refinement: |
-    You are analyzing a technical image that was already identified as relevant to a document.
+    Here is the description of the attached image: {description}. 
 
-    Given this description: "{description}"
+    Analyze the actual image and respond with EXACTLY one of these two options:
 
-    Examine the attached image very carefully and determine if it contains meaningful VISUAL technical content:
+    1. If the image is ONLY a company logo, brand name, or simple text without technical content: respond with only the word "False"
+    2. For all other images: provide a detailed description based on what you see in the image
 
-    RETURN FALSE if the image is:
-    - A simple logo, company branding, or watermark
-    - Pure text tables or specifications without visual elements
-    - Text headers, titles, or labels without diagrams
-    - Simple boxes with only text content
-    - Decorative borders or graphic elements
-    - Screenshots of text without visual information
-    - Completely blank or uninformative
+    RESPOND WITH ONLY "False" (nothing else) FOR:
+    - Company logos or brand names
+    - Simple text-only images without technical diagrams
 
-    RETURN ENRICHED DESCRIPTION ONLY if the image contains ACTUAL VISUAL technical content:
-    - Technical diagrams, schematics, engineering drawings
-    - Visual charts, graphs, or data plots
-    - Photographs of physical equipment, materials, specimens
-    - Structural drawings with visual geometry and measurements
-    - Test setups showing physical arrangements
-    - Visual illustrations that convey information beyond text
+    FOR ALL OTHER IMAGES, provide a direct description that:
+    - Starts immediately with the description (no prefixes like "Enhanced description:" or "This image shows:")
+    - Describes what you actually see in the image
+    - Includes technical details, measurements, labels, components visible
+    - Focuses on technical and engineering content
 
-    Be STRICT: If the image is primarily text-based (tables, specifications, labels) without meaningful visual elements, return FALSE.
-
-    If the image contains genuine visual technical information, expand the description with:
-    - Visual elements, shapes, structures shown
-    - Measurements, dimensions, or scale indicators visible in the image
-    - Technical symbols, arrows, or visual annotations
-    - Physical relationships and spatial arrangements
-    - Colors, materials, or textures that convey technical information
-
-    Return either "False" or the expanded visual description.
+    IMPORTANT: Do not explain your reasoning. Return either "False" or start directly with the description.
