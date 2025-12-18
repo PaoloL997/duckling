@@ -37,19 +37,15 @@ prompts:
   image_refinement: |
     Here is the description of the attached image: {description}. 
 
-    Analyze the actual image and respond with EXACTLY one of these two options:
+    Analyze the actual image and provide an enhanced, detailed description based on what you see. Expand and refine the existing description with specific details observed in the image.
 
-    1. If the image is ONLY a company logo, brand name, or simple text without technical content: respond with only the word "False"
-    2. For all other images: provide a detailed description based on what you see in the image
+    Your enhanced description should:
+    - Start immediately with the description (no prefixes like "Enhanced description:" or "This image shows:")
+    - Include all visible technical details, measurements, labels, text, numbers, and components
+    - Describe materials, shapes, dimensions, and spatial relationships of technical elements
+    - Identify any symbols, abbreviations, scales, annotations, or technical markings
+    - Focus exclusively on technical and engineering content
+    - Preserve and enhance any relevant technical information from the original description
+    - Be precise about specifications, tolerances, part numbers, or technical identifiers
 
-    RESPOND WITH ONLY "False" (nothing else) FOR:
-    - Company logos or brand names
-    - Simple text-only images without technical diagrams
-
-    FOR ALL OTHER IMAGES, provide a direct description that:
-    - Starts immediately with the description (no prefixes like "Enhanced description:" or "This image shows:")
-    - Describes what you actually see in the image
-    - Includes technical details, measurements, labels, components visible
-    - Focuses on technical and engineering content
-
-    IMPORTANT: Do not explain your reasoning. Return either "False" or start directly with the description.
+    IMPORTANT: Focus only on technical details. Exclude decorative elements, backgrounds, or non-technical visual aspects.
