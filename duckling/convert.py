@@ -152,12 +152,35 @@ class DucklingPDF(BaseDocumentConverter):
         return all_images
 
     # TODO: Aggiungi metodo per refine
-    def refine_image_descriptions(self, images: list) -> list:
-        print(images)
-        # TODO: deve aprire le singole immagini e convertirle in base64
-        # TODO: se l'immagine non contiene informazioni rilevanti (e.g., è un logo) eliminala
-        # TODO: se l'immagine contiene testo, misure, informazioni rilevanti, mantienila e aggiorna la descrizione
-        return []
+    def refine_image_descriptions(self, images: list, source_path: str) -> list:
+        refined_images = []
+        prompt = self.config.prompts("image_refinement")
+        for image_description in images:
+            path = image_description.get("path", "")
+            complete_path = Path(source_path) / path
+            description = image_description.get("description", "")
+            base64_image = self._file_to_base64(complete_path)
+            query = prompt.format(description=description)
+            messages = HumanMessage(
+                content=[
+                    {"type": "text", "text": query},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{base64_image}"},
+                    },
+                ]
+            )
+            response = self.llm.invoke([messages]).content
+            if type(response) is str and response.strip().lower() == "false":
+                continue
+            refined_images.append(
+                {
+                    "path": path,
+                    "description": response,
+                    "name": image_description.get("name", ""),
+                }
+            )
+        return refined_images
 
     def create_image_documents(
         self, all_images: list, filepath: str, namespace: str = "namespace"
@@ -233,9 +256,11 @@ class DucklingPDF(BaseDocumentConverter):
         llm_chunks = self.split_markdown_for_llm(markdown_content)
         all_images = self.extract_image_descriptions(llm_chunks)
         all_relevant_images = [img for img in all_images if img.get("relevant") is True]
-        image_docs = self.create_image_documents(
-            all_relevant_images, filepath, namespace
+        refined_images = self.refine_image_descriptions(
+            all_relevant_images, str(source_path)
         )
+        # refined_images = all_relevant_images
+        image_docs = self.create_image_documents(refined_images, filepath, namespace)
 
         all_docs = text_docs + image_docs
         logger.info(

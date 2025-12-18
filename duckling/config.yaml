@@ -33,3 +33,38 @@ prompts:
     objects, or features. Mention colors, composition, and general atmosphere if noticeable. If any measurements, dimensions, scale
     indicators, abbreviations, symbols, numbers, or text appear in the image, include them accurately in the description. Focus on
     providing a clear, precise, and complete account of everything observable in the image.
+
+  image_refinement: |
+    You are analyzing a technical image that was already identified as relevant to a document.
+
+    Given this description: "{description}"
+
+    Examine the attached image very carefully and determine if it contains meaningful VISUAL technical content:
+
+    RETURN FALSE if the image is:
+    - A simple logo, company branding, or watermark
+    - Pure text tables or specifications without visual elements
+    - Text headers, titles, or labels without diagrams
+    - Simple boxes with only text content
+    - Decorative borders or graphic elements
+    - Screenshots of text without visual information
+    - Completely blank or uninformative
+
+    RETURN ENRICHED DESCRIPTION ONLY if the image contains ACTUAL VISUAL technical content:
+    - Technical diagrams, schematics, engineering drawings
+    - Visual charts, graphs, or data plots
+    - Photographs of physical equipment, materials, specimens
+    - Structural drawings with visual geometry and measurements
+    - Test setups showing physical arrangements
+    - Visual illustrations that convey information beyond text
+
+    Be STRICT: If the image is primarily text-based (tables, specifications, labels) without meaningful visual elements, return FALSE.
+
+    If the image contains genuine visual technical information, expand the description with:
+    - Visual elements, shapes, structures shown
+    - Measurements, dimensions, or scale indicators visible in the image
+    - Technical symbols, arrows, or visual annotations
+    - Physical relationships and spatial arrangements
+    - Colors, materials, or textures that convey technical information
+
+    Return either "False" or the expanded visual description.
