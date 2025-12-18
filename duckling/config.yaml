@@ -5,26 +5,19 @@
 prompts:
   retrive_image_description: |
     You are given the following markdown content extracted from a PDF document. 
-    Your task is to analyze ALL images present in the markdown and determine their relevance.
+    Your task is to identify all images present in the markdown and extract their names from the surrounding text.
 
-    For each image found, create a JSON object with the following fields:
+    For each image, create a JSON object with the following fields:
     - "path": the full path or URL of the image as it appears in the markdown
-    - "name": the name or identifier used to reference this image in the text (e.g., "Figure 1", "Schema A", etc.) or "Generic" if no specific reference
-    - "description": a detailed explanation of what the image represents based on its context
-    - "relevant": boolean - true if the image has specific textual reference (Figure 1, Diagram A, Table 2, etc.), false if it's decorative/generic/logo/unreferenced
+    - "name": the exact name or identifier used to reference this image in the text. 
+    - "description": a detailed, reasoned explanation of what the image represents based on its surrounding context and purpose.
 
-    RELEVANCE CRITERIA (relevant: true):
-    - Image is specifically mentioned by name/number in the text (e.g., "Figure 1", "Diagram A", "Schema B", "Table 2")
-    - Image is directly referenced (e.g., "see Figure X", "as shown in", "the diagram below")
+    IMPORTANT: 
+    - Carefully search the text before and after each image to find its proper name/reference
+    - If the same image appears multiple times, create only one entry with a merged, comprehensive description
+    - The "name" field should contain the exact reference as it appears in the document text
 
-    NOT RELEVANT (relevant: false):
-    - Logos, icons, watermarks, decorative elements
-    - Images with only generic references like "Image", "Picture"
-    - Images not mentioned in the surrounding text
-    - Header/footer graphics
-
-    IMPORTANT: Include ALL images but mark their relevance correctly.
-
+    Output must be a single valid JSON array.
     Markdown content:
     {markdown_content}
 
@@ -35,17 +28,10 @@ prompts:
     providing a clear, precise, and complete account of everything observable in the image.
 
   image_refinement: |
-    Here is the description of the attached image: {description}. 
+    The attached image corresponds to the following description: {description}.
 
-    Analyze the actual image and provide an enhanced, detailed description based on what you see. Expand and refine the existing description with specific details observed in the image.
+    Carefully analyze the image and expand the provided description by including all visible details shown in the image.
+    Make sure to cover text, symbols, labels, measurements, numerical values, annotations, and any other relevant visual elements present in the image.
+    The resulting description should be comprehensive, precise, and faithful to what is visually observable.
 
-    Your enhanced description should:
-    - Start immediately with the description (no prefixes like "Enhanced description:" or "This image shows:")
-    - Include all visible technical details, measurements, labels, text, numbers, and components
-    - Describe materials, shapes, dimensions, and spatial relationships of technical elements
-    - Identify any symbols, abbreviations, scales, annotations, or technical markings
-    - Focus exclusively on technical and engineering content
-    - Preserve and enhance any relevant technical information from the original description
-    - Be precise about specifications, tolerances, part numbers, or technical identifiers
-
-    IMPORTANT: Focus only on technical details. Exclude decorative elements, backgrounds, or non-technical visual aspects.
+    Return the enhanced description only, without any additional commentary or formatting.

@@ -20,6 +20,7 @@ from langchain_openai import ChatOpenAI
 from .base import BaseDocumentConverter
 from .utilities import setup_logger
 from .config import Config
+from .options import ImageOptions
 
 logger = setup_logger(__name__)
 load_dotenv()
@@ -151,12 +152,11 @@ class DucklingPDF(BaseDocumentConverter):
                 logger.error("Failed to parse JSON from chunk %d: %s", i, e)
         return all_images
 
-    # TODO: Aggiungi metodo per refine
     def refine_image_descriptions(self, images: list, source_path: str) -> list:
         refined_images = []
         prompt = self.config.prompts("image_refinement")
 
-        for i, image_description in enumerate(images, 1):
+        for image_description in images:
             path = image_description.get("path", "")
             complete_path = Path(source_path) / path
             description = image_description.get("description", "")
@@ -173,10 +173,6 @@ class DucklingPDF(BaseDocumentConverter):
                 ]
             )
             response = self.llm.invoke([messages]).content
-
-            if type(response) is str and response.strip().lower() == "false":
-                continue
-
             refined_images.append(
                 {
                     "path": path,
@@ -257,13 +253,24 @@ class DucklingPDF(BaseDocumentConverter):
         with open(md_filepath, "r", encoding="utf-8") as f:
             markdown_content = f.read()
 
-        llm_chunks = self.split_markdown_for_llm(markdown_content)
-        all_images = self.extract_image_descriptions(llm_chunks)
-        all_relevant_images = [img for img in all_images if img.get("relevant") is True]
-        refined_images = self.refine_image_descriptions(
-            all_relevant_images, str(source_path)
+        image_options = ImageOptions(
+            page_width=list(document.pages.values())[0].size.width
+            * 4,  # Image scale == 4
+            page_height=list(document.pages.values())[0].size.height * 4,
+            min_size_ratio=0.1,
         )
-        # refined_images = all_relevant_images
+
+        cleaned_markdown = image_options.filter_images(
+            markdown_content=markdown_content,
+            source_path=source_path,
+        )
+
+        with open(md_filepath, "w", encoding="utf-8") as f:
+            f.write(cleaned_markdown)
+
+        llm_chunks = self.split_markdown_for_llm(cleaned_markdown)
+        all_images = self.extract_image_descriptions(llm_chunks)
+        refined_images = self.refine_image_descriptions(all_images, str(source_path))
         image_docs = self.create_image_documents(refined_images, filepath, namespace)
 
         all_docs = text_docs + image_docs
