@@ -1,21 +1,30 @@
-models:
+﻿models:
   llm: gpt-4.1-nano
   tokenizer: sentence-transformers/all-MiniLM-L6-v2
 
 prompts:
   retrive_image_description: |
     You are given the following markdown content extracted from a PDF document. 
-    Your task is to identify all images present in the markdown that have a clear textual reference in the surrounding content (e.g., “Figure 1”, “Diagram A”, “see below”, etc.). 
-    **Do not include images that appear only as ![Image](path) without any clear reference in the text.**
+    Your task is to analyze ALL images present in the markdown and determine their relevance.
 
-    For each referenced image, create a JSON object with the following fields:
+    For each image found, create a JSON object with the following fields:
     - "path": the full path or URL of the image as it appears in the markdown
-    - "name": the name or identifier used to reference this image in the text (e.g., "Figure 1", "Diagram A", etc.)
-    - "description": a detailed, reasoned explanation of what the image represents based on its surrounding context and purpose.
+    - "name": the name or identifier used to reference this image in the text (e.g., "Figure 1", "Schema A", etc.) or "Generic" if no specific reference
+    - "description": a detailed explanation of what the image represents based on its context
+    - "relevant": boolean - true if the image has specific textual reference (Figure 1, Diagram A, Table 2, etc.), false if it's decorative/generic/logo/unreferenced
 
-    IMPORTANT: If the same image appears multiple times, create only one entry with a merged, comprehensive description.
+    RELEVANCE CRITERIA (relevant: true):
+    - Image is specifically mentioned by name/number in the text (e.g., "Figure 1", "Diagram A", "Schema B", "Table 2")
+    - Image is directly referenced (e.g., "see Figure X", "as shown in", "the diagram below")
 
-    Output must be a single valid JSON array.
+    NOT RELEVANT (relevant: false):
+    - Logos, icons, watermarks, decorative elements
+    - Images with only generic references like "Image", "Picture"
+    - Images not mentioned in the surrounding text
+    - Header/footer graphics
+
+    IMPORTANT: Include ALL images but mark their relevance correctly.
+
     Markdown content:
     {markdown_content}
 

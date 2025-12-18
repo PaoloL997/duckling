@@ -56,6 +56,19 @@ class DucklingPDF(BaseDocumentConverter):
         self.llm = ChatOpenAI(model=self.llm_model_name)
         self.image_prompt = self.config.prompts("retrive_image_description")
 
+    @staticmethod
+    def _file_to_base64(path: str) -> str:
+        """Convert a file to a base64-encoded string.
+
+        Args:
+            path: Path to the file to encode.
+
+        Returns:
+            str: Base64-encoded file content.
+        """
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
     def save_as_markdown(self, document, md_filepath: Path):
         """Save a Docling document as markdown file with embedded images.
 
@@ -138,6 +151,14 @@ class DucklingPDF(BaseDocumentConverter):
                 logger.error("Failed to parse JSON from chunk %d: %s", i, e)
         return all_images
 
+    # TODO: Aggiungi metodo per refine
+    def refine_image_descriptions(self, images: list) -> list:
+        print(images)
+        # TODO: deve aprire le singole immagini e convertirle in base64
+        # TODO: se l'immagine non contiene informazioni rilevanti (e.g., è un logo) eliminala
+        # TODO: se l'immagine contiene testo, misure, informazioni rilevanti, mantienila e aggiorna la descrizione
+        return []
+
     def create_image_documents(
         self, all_images: list, filepath: str, namespace: str = "namespace"
     ) -> list:
@@ -211,7 +232,10 @@ class DucklingPDF(BaseDocumentConverter):
 
         llm_chunks = self.split_markdown_for_llm(markdown_content)
         all_images = self.extract_image_descriptions(llm_chunks)
-        image_docs = self.create_image_documents(all_images, filepath, namespace)
+        all_relevant_images = [img for img in all_images if img.get("relevant") is True]
+        image_docs = self.create_image_documents(
+            all_relevant_images, filepath, namespace
+        )
 
         all_docs = text_docs + image_docs
         logger.info(
