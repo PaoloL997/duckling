@@ -161,6 +161,11 @@ class DucklingPDF(BaseDocumentConverter):
             complete_path = Path(source_path) / path
             description = image_description.get("description", "")
 
+            # Skip if image file doesn't exist
+            if not complete_path.exists():
+                logger.warning("Image file not found: %s", complete_path)
+                continue
+
             base64_image = self._file_to_base64(complete_path)
             query = prompt.format(description=description)
             messages = HumanMessage(
@@ -268,10 +273,17 @@ class DucklingPDF(BaseDocumentConverter):
         with open(md_filepath, "w", encoding="utf-8") as f:
             f.write(cleaned_markdown)
 
-        llm_chunks = self.split_markdown_for_llm(cleaned_markdown)
-        all_images = self.extract_image_descriptions(llm_chunks)
-        refined_images = self.refine_image_descriptions(all_images, str(source_path))
-        image_docs = self.create_image_documents(refined_images, filepath, namespace)
+        # Only process images if artifacts directory contains files
+        image_docs = []
+        if any(artifacts_path.iterdir()):
+            llm_chunks = self.split_markdown_for_llm(cleaned_markdown)
+            all_images = self.extract_image_descriptions(llm_chunks)
+            refined_images = self.refine_image_descriptions(
+                all_images, str(source_path)
+            )
+            image_docs = self.create_image_documents(
+                refined_images, filepath, namespace
+            )
 
         all_docs = text_docs + image_docs
         logger.info(

@@ -4,20 +4,32 @@
 
 prompts:
   retrive_image_description: |
-    You are given the following markdown content extracted from a PDF document. 
-    Your task is to identify all images present in the markdown and extract their names from the surrounding text.
+    You are given the following markdown content extracted from a PDF document.
 
-    For each image, create a JSON object with the following fields:
-    - "path": the full path or URL of the image as it appears in the markdown
-    - "name": the exact name or identifier used to reference this image in the text. 
-    - "description": a detailed, reasoned explanation of what the image represents based on its surrounding context and purpose.
+    Your task is to identify and process images ONLY when they are explicitly defined using the following Markdown syntax:
 
-    IMPORTANT: 
-    - Carefully search the text before and after each image to find its proper name/reference
-    - If the same image appears multiple times, create only one entry with a merged, comprehensive description
-    - The "name" field should contain the exact reference as it appears in the document text
+    ![Image](path/to/image)
 
-    Output must be a single valid JSON array.
+    IMPORTANT RULES:
+    - Consider an image present ONLY if the exact Markdown pattern `![Image](...)` exists.
+    - Ignore any textual references to figures, diagrams, screenshots, or images that are NOT accompanied by this syntax.
+    - Do NOT infer images from captions, figure numbers, or descriptive text alone.
+
+    For each valid image found, create a JSON object with the following fields:
+    - "path": the full path or URL of the image exactly as it appears inside the parentheses
+    - "name": the exact name or identifier used to reference this image in the surrounding text (before or after the image).  
+      - If no explicit name or identifier is present, use the image filename (without extension) as the name.
+    - "description": a detailed and reasoned explanation of what the image represents, inferred strictly from the surrounding text and its role in the document.
+
+    Additional constraints:
+    - Carefully analyze the text immediately before and after each image to determine its correct reference name and purpose.
+    - If the same image path appears multiple times, output only one JSON object with a merged and comprehensive description.
+    - Do not hallucinate or invent images that are not explicitly present via the Markdown syntax.
+
+    Output format:
+    - Return a single valid JSON array.
+    - Do not include any additional text outside the JSON.
+
     Markdown content:
     {markdown_content}
 
