@@ -1,5 +1,6 @@
 ﻿models:
   llm: gpt-4.1-nano
+  draw_llm: gpt-4.1-mini
   tokenizer: sentence-transformers/all-MiniLM-L6-v2
 
 prompts:

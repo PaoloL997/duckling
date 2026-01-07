@@ -21,6 +21,7 @@ from .base import BaseDocumentConverter
 from .utilities import setup_logger
 from .config import Config
 from .options import ImageOptions
+from .draws import compute_vector_density, DrawConverter
 
 logger = setup_logger(__name__)
 load_dotenv()
@@ -241,8 +242,6 @@ class DucklingPDF(BaseDocumentConverter):
         Returns:
             list: All LangChain Document objects (text chunks and image descriptions).
         """
-        document = super().convert_document(filepath)
-        text_docs = super().chunk_document(document, namespace=namespace)
 
         root_path = Path("media")
         root_path.mkdir(exist_ok=True)
@@ -250,29 +249,36 @@ class DucklingPDF(BaseDocumentConverter):
         source_path.mkdir(exist_ok=True)
         artifacts_path = source_path / "artifacts"
         artifacts_path.mkdir(exist_ok=True)
-
         self.copy_source_file(filepath, source_path)
+
+        if compute_vector_density(filepath):
+            # Technical drawing PDF
+            dconv = DrawConverter(model=self.config.models("draw_llm"))
+            all_docs = dconv.process(filepath, namespace=namespace)
+            logger.info(
+                "Processing complete: total %d documents from technical draw.",
+                len(all_docs),
+            )
+            return all_docs
+        # Text-based PDF
+        document = super().convert_document(filepath)
+        text_docs = super().chunk_document(document, namespace=namespace)
         md_filepath = source_path / f"{Path(filepath).stem}.md"
         self.save_as_markdown(document, md_filepath)
-
         with open(md_filepath, "r", encoding="utf-8") as f:
             markdown_content = f.read()
-
         image_options = ImageOptions(
             page_width=list(document.pages.values())[0].size.width
             * 4,  # Image scale == 4
             page_height=list(document.pages.values())[0].size.height * 4,
             min_size_ratio=0.1,
         )
-
         cleaned_markdown = image_options.filter_images(
             markdown_content=markdown_content,
             source_path=source_path,
         )
-
         with open(md_filepath, "w", encoding="utf-8") as f:
             f.write(cleaned_markdown)
-
         # Only process images if artifacts directory contains files
         image_docs = []
         if any(artifacts_path.iterdir()):
@@ -284,7 +290,6 @@ class DucklingPDF(BaseDocumentConverter):
             image_docs = self.create_image_documents(
                 refined_images, filepath, namespace
             )
-
         all_docs = text_docs + image_docs
         logger.info(
             "Processing complete: %d text chunks, "
