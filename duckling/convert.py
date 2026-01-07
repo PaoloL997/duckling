@@ -253,7 +253,7 @@ class DucklingPDF(BaseDocumentConverter):
 
         if compute_vector_density(filepath):
             # Technical drawing PDF
-            dconv = DrawConverter(model=self.config.models("draw_llm"))
+            dconv = DrawConverter(config=self.config)
             all_docs = dconv.process(filepath, namespace=namespace)
             logger.info(
                 "Processing complete: total %d documents from technical draw.",

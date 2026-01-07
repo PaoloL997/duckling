@@ -4,6 +4,7 @@ from pathlib import Path
 import fitz
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
+from .config import Config
 
 
 def compute_vector_density(path: str):
@@ -41,38 +42,14 @@ def compute_vector_density(path: str):
 class DrawConverter:
     """Generate structured descriptions for technical drawings in PDF format."""
 
-    IMAGE_ANALYSIS_PROMPT = """
-        Role: You are an expert Technical Document Analyst specialized in engineering blueprints, CAD exports, and architectural plans.
-        Task: Provide a comprehensive, structured description of the attached technical drawing (File Name: {filename}). This description will serve as a searchable index for a RAG (Retrieval-Augmented Generation) system.
-        Instructions: Analyze the image meticulously and provide a report covering the following sections:
-        - Header & Title Block: Extract the document title, part/drawing number, author, date, and revision history.
-        - Primary Subject & Scope: Describe the main assembly, component, or architectural area shown. Identify the type of drawing (e.g., assembly, schematic, P&ID, layout).
-        - Tabular Data & Schedules (CRITICAL): Identify and transcribe all tables present in the drawing (e.g., Bill of Materials (BOM), Parts List, Revision Tables, or Specification Schedules). For each table, describe its columns and highlight key rows or materials listed.
-        - Components & Annotations: List all labeled parts, callouts, and technical notes. Include specific references to dimensions, tolerances, and material callouts.
-        - Visual Context: Describe the views provided (e.g., isometric, sectional views, details) and the spatial relationship between components.
-        - Key Search Terms: Provide a list of 10-15 technical keywords found within the drawing that an expert would use to find this specific document.
-        Output Style: Use precise, technical terminology. When describing tables, represent the data clearly so it can be easily indexed for text-based retrieval.
-    """
-
-    ORGANIZE_PROMPT = """
-        Role: You are a Senior Technical Documentation Architect.
-        Task: You have been provided with multiple individual descriptions of pages belonging to a single technical document (File Name: {filename}). Your goal is to synthesize these descriptions into a single, unified Master Summary that provides a clear overview of the entire project or assembly.
-        Input Data: {list_of_page_descriptions}
-        Instructions for Synthesis:
-        - Global Overview: Start with a high-level summary of what the entire document represents (e.g., "This is a 5-page structural set for a bridge assembly").
-        - Logical Flow: Organize the information following the document's logical progression (e.g., from General Layout to specific Component Details or BOM tables)
-        - Consolidated Tables & Lists: Merge information from tables found across different pages. If Page 1 has a partial BOM and Page 5 continues it, present a unified summary of the materials and components involved.
-        - Cross-Page Relationships: Explain how the pages relate to each other (e.g., "Page 2 provides a sectional view of the assembly shown in the isometric view on Page 1").
-        - Technical Consistency: Ensure that part numbers, dimensions, and specifications are cross-referenced accurately. Eliminate redundant descriptions while keeping all unique technical data.
-        Final Output Objective: Create a "Searchable Knowledge Base Entry" that allows a RAG system to understand the full scope of the document without reading individual page reports. Focus on technical keywords and functional relationships.
-    """
-
-    def __init__(self, model: str):
+    def __init__(self, config: Config):
         """Initialize the DrawConverter with a specified LLM model.
 
         Args:
             model: The name of the OpenAI model to use.
         """
+        self.config = config
+        model = self.config.models("draw_llm")
         self.llm = ChatOpenAI(model=model)
 
     @staticmethod
@@ -103,7 +80,9 @@ class DrawConverter:
                 "content": [
                     {
                         "type": "text",
-                        "text": self.IMAGE_ANALYSIS_PROMPT.format(filename=filename),
+                        "text": self.config.prompts("draw_analysis").format(
+                            filename=filename
+                        ),
                     },
                     {
                         "type": "image_url",
@@ -159,7 +138,7 @@ class DrawConverter:
         if len(pages_description) == 1:
             final_description = pages_description[0]
         else:
-            organize_query = self.ORGANIZE_PROMPT.format(
+            organize_query = self.config.prompts("organize_draw_description").format(
                 filename=filename, list_of_page_descriptions=pages_description
             )
             final_description = self.llm.invoke(organize_query).content
