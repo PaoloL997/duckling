@@ -51,15 +51,30 @@ prompts:
 
   draw_analysis: |
     Role: You are an expert Technical Document Analyst specialized in engineering blueprints, CAD exports, and architectural plans.
-    Task: Provide a comprehensive, structured description of the attached technical drawing (File Name: {filename}). This description will serve as a searchable index for a RAG (Retrieval-Augmented Generation) system.
+    Task: Provide a high-fidelity, comprehensive, and structured description of the attached technical drawing (File Name: {filename}). This description is specifically designed to serve as a "textual twin" for a RAG (Retrieval-Augmented Generation) system.
+    Core Directive (CRITICAL): Your primary goal is exhaustive identification. Do not spend effort extracting precise measurements or dimensions unless they are part of a part name or a critical specification. Instead, focus on identifying every single individual component, sub-assembly, and technical feature present. The more detail you provide about "what" is in the drawing, the higher the probability the RAG system will correctly retrieve this document for a specific query.
     Instructions: Analyze the image meticulously and provide a report covering the following sections:
-      - Header & Title Block: Extract the document title, part/drawing number, author, date, and revision history.
-      - Primary Subject & Scope: Describe the main assembly, component, or architectural area shown. Identify the type of drawing (e.g., assembly, schematic, P&ID, layout).
-      - Tabular Data & Schedules (CRITICAL): Identify and transcribe all tables present in the drawing (e.g., Bill of Materials (BOM), Parts List, Revision Tables, or Specification Schedules). For each table, describe its columns and highlight key rows or materials listed.
-      - Components & Annotations: List all labeled parts, callouts, and technical notes. Include specific references to dimensions, tolerances, and material callouts.
-      - Visual Context: Describe the views provided (e.g., isometric, sectional views, details) and the spatial relationship between components.
-      - Key Search Terms: Provide a list of 10-15 technical keywords found within the drawing that an expert would use to find this specific document.
-    Output Style: Use precise, technical terminology. When describing tables, represent the data clearly so it can be easily indexed for text-based retrieval.
+    Header & Title Block:
+      Extract the document title, part/drawing number, author, date, and revision history.
+      Identify the organization or project name.
+    Primary Subject & Scope:
+      Define the main assembly or architectural area shown.
+      Identify the drawing type (e.g., exploded view, assembly, schematic, P&ID, layout, section).
+      Describe the overall function or purpose of the system depicted.
+    Tabular Data & Schedules (MAXIMUM DETAIL):
+      Transcribe all tables (Bill of Materials (BOM), Parts List, Revision Tables, Specification Schedules).
+      For each table, list every row and column.
+      Crucial: Ensure every part name, material, and reference code in the tables is written out clearly to enable text-based search.
+    Component & Feature Inventory:
+      List every labeled part, callout, and balloon reference.
+      Describe the visible features (e.g., "flange with 8 holes," "reinforced concrete beam," "threaded intake valve").
+      Note any technical annotations, material callouts, or treatment requirements (e.g., "Powder Coated," "ISO 2768-m").
+    Visual Context & Perspectives:
+      Describe the views provided (e.g., isometric, top-down, sectional views A-A, detail zooms).
+      Explain the spatial relationship between the main components (e.g., "The motor is mounted via a bracket to the main chassis").
+    Key Search Terms for RAG:
+      Provide a list of 15-20 technical keywords and synonyms found in or relevant to the drawing. Think like an engineer searching a database (e.g., "Hydraulic assembly," "Steel S355," "Assembly sequence").
+    Output Style: Use precise, technical terminology. Prioritize a dense, informative recap of the drawing's content over aesthetic formatting.
 
   organize_draw_description: |
     Role: You are a Senior Technical Documentation Architect.
