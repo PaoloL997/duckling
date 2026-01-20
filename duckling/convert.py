@@ -291,6 +291,14 @@ class DucklingPDF(BaseDocumentConverter):
                 refined_images, filepath, namespace
             )
         all_docs = text_docs + image_docs
+        if not all_docs:
+            # TODO: fallback su analisi disegni
+            logger.info(
+                "PDF analysis did not yield results, fall back to drawing analysis."
+            )
+            dconv = DrawConverter(config=self.config)
+            all_docs = dconv.process(filepath, namespace=namespace)
+            return all_docs
         logger.info(
             "Processing complete: %d text chunks, "
             "%d image descriptions, total %d documents.",
