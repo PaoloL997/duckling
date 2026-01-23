@@ -1,3 +1,5 @@
+"""Utilities to filter and clean image references in markdown."""
+
 import os
 import re
 from pathlib import Path

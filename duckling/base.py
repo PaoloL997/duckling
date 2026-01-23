@@ -1,56 +1,41 @@
-"""Base document converter for PDF processing.
-
-This module provides the BaseDocumentConverter class which handles PDF conversion,
-tokenization, chunking, and preparation of documents for downstream processing.
-"""
-
-import shutil
+"""Base converter utilities for document loading and chunking."""
 
 from typing import List
 from pathlib import Path
 
 from transformers import AutoTokenizer
-from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from docling.chunking import HybridChunker
-from docling.datamodel.base_models import InputFormat
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.document_converter import DocumentConverter
 from docling_core.types.doc import DoclingDocument
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from langchain_core.documents import Document
 
 from dotenv import load_dotenv
 
-from duckling.config import Config
-
-
 load_dotenv()
 
-cfg = Config()
 
+class BaseConverter:
+    """Base converter that handles document loading and chunking.
 
-class BaseDocumentConverter:
-    """Base class for converting and chunking documents.
-
-    Handles PDF conversion, tokenization using HuggingFace models, and splitting
-    documents into chunks using the HybridChunker strategy.
+    This class provides utilities to load documents via a
+    DocumentConverter and split them into token-aware chunks.
     """
 
     def __init__(
         self,
         max_tokens: int = 4096,
-        config: Config | None = None,
+        tokenizer: str = "sentence-transformers/all-MiniLM-L6-v2",
     ):
-        """Initialize the BaseDocumentConverter.
+        """Initialize the base converter.
 
         Args:
-            max_tokens: Maximum number of tokens per text chunk. Defaults to 4096.
+            max_tokens: Maximum tokens for chunking.
+            tokenizer: HuggingFace tokenizer identifier.
         """
-        self.config = config if config else cfg
         self.max_tokens = max_tokens
-
         self.tokenizer = HuggingFaceTokenizer(
-            tokenizer=AutoTokenizer.from_pretrained(self.config.models("tokenizer")),
+            tokenizer=AutoTokenizer.from_pretrained(tokenizer),
             max_tokens=max_tokens,
         )
 
@@ -59,48 +44,29 @@ class BaseDocumentConverter:
             merge_peers=True,
         )
 
-    def convert_document(self, source_path: str):
-        """Convert a PDF document using Docling.
+    def load(self, path: str) -> DoclingDocument:
+        """Load a document from disk and convert it to a DoclingDocument.
 
         Args:
-            source_path: Path to the PDF file to convert.
+            path: Filesystem path to the source document.
 
         Returns:
-            DoclingDocument: The converted document object.
+            A `DoclingDocument` representing the converted document.
         """
-        pipeline_options = PdfPipelineOptions(
-            generate_picture_images=True, do_formula_enrichment=True, images_scale=4
-        )
-        accel_opts = AcceleratorOptions(device=AcceleratorDevice.CUDA, num_threads=8)
-        pipeline_options.accelerator_options = accel_opts
-        pipeline_options.do_ocr = True
-        converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-            }
-        )
-        return converter.convert(source=source_path).document
+        converter = DocumentConverter()
+        return converter.convert(source=path).document
 
-    def copy_source_file(self, filepath: str, source_path: Path):
-        """Copy source file to destination path.
-
-        Args:
-            filepath: Path to the source file.
-            source_path: Destination directory path.
-        """
-        shutil.copy2(filepath, source_path / Path(filepath).name)
-
-    def chunk_document(
+    def chunk(
         self, document: DoclingDocument, namespace: str = "namespace"
     ) -> List[Document]:
-        """Split a Docling document into LangChain Document chunks.
+        """Split a DoclingDocument into a list of LangChain Documents.
 
         Args:
-            document: A DoclingDocument object to chunk.
-            namespace: Namespace identifier for the documents.
+            document: The input `DoclingDocument` to chunk.
+            namespace: Namespace to attach to document metadata.
 
         Returns:
-            List[Document]: A list of LangChain Document objects with metadata.
+            A list of `langchain_core.documents.Document` objects.
         """
         chunks = list(self.chunker.chunk(dl_doc=document))
         docs = []
