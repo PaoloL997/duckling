@@ -28,7 +28,7 @@ class DucklingGraph:
 
     def __init__(
         self,
-        max_tokens: int = 4996,
+        max_tokens: int = 4096,
         tokenizer: str = "sentence-transformers/all-MiniLM-L6-v2",
         llm: str = "gpt-4.1-nano",
     ):
