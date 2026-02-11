@@ -3,6 +3,7 @@
 import shutil
 import base64
 from pathlib import Path
+from langchain_core.documents import Document
 
 import fitz
 
@@ -84,3 +85,19 @@ def is_a4(path: str):
         return True
     finally:
         doc.close()
+
+
+def get_types_count(documents: list[Document]) -> dict:
+    """Count the number of documents by type.
+
+    Args:
+        documents: List of `Document` objects to count.
+
+    Returns:
+        Dictionary mapping document types to their counts.
+    """
+    counts: dict[str, int] = {}
+    for doc in documents:
+        doc_type = doc.metadata.get("type", "unknown")
+        counts[doc_type] = counts.get(doc_type, 0) + 1
+    return counts

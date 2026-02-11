@@ -8,7 +8,7 @@ from duckling.files.table import Table
 from duckling.files.image import Image
 from duckling.files.pdf.convert import PDF
 from duckling.files.pdf.draw import Draw
-from duckling.utils import is_a4
+from duckling.utils import is_a4, get_types_count
 from duckling.state import State
 
 
@@ -108,9 +108,13 @@ class DucklingGraph:
         Returns:
             Empty dict; the graph uses conditional edges to decide next step.
         """
-        if len(state.get("documents", [])) == 0:
+        types_count = get_types_count(state.get("documents", []))
+        print(f"Document types count: {types_count}")
+
+        # Check if we have text documents - if not, we'll fallback to drawing PDF
+        if len(state.get("documents", [])) == 0 or types_count.get("text", 0) == 0:
             print(
-                "No documents extracted from standard PDF conversion. Falling back to drawing-based conversion."
+                "No text documents extracted from standard PDF conversion. Falling back to drawing-based conversion."
             )
         return {}
 
@@ -176,12 +180,21 @@ class DucklingGraph:
 
         graph.add_edge("standard_pdf", "check_documents")
         graph.add_edge("drawing_pdf", END)
-        # Nodo di controllo: se `documents` è vuoto -> fallback su drawing_pdf
+
+        # Nodo di controllo: se non ci sono documenti di tipo text -> fallback su drawing_pdf
+        def should_fallback(state):
+            """Check if we should fallback to drawing PDF conversion."""
+            types_count = get_types_count(state.get("documents", []))
+            has_text_documents = types_count.get("text", 0) > 0
+            has_any_documents = len(state.get("documents", [])) > 0
+
+            if has_any_documents and has_text_documents:
+                return "has_documents"
+            return "no_documents"
+
         graph.add_conditional_edges(
             "check_documents",
-            lambda state: "has_documents"
-            if state.get("documents") and len(state.get("documents")) > 0
-            else "no_documents",
+            should_fallback,
             {"has_documents": END, "no_documents": "drawing_pdf"},
         )
         graph.add_edge("image", END)
