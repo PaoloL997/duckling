@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "duckling" }]
 
 [tool.poetry.dependencies]
-python = ">=3.12,<3.14"
+python = ">=3.10,<3.14"
 
 torch = { version = "==2.8.0", source = "pytorch" }
 torchvision = { version = "==0.23.0", source = "pytorch" }
