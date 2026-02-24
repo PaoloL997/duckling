@@ -21,7 +21,20 @@ async def convert(
         namespace = Path(str(file.filename)).stem
         state = converter.run(path=temp_path, namespace=namespace)
 
-        folder_path = os.path.join("media", Path(temp_path).stem)
+        folder_path = os.path.join("media", namespace)
+        os.makedirs(folder_path, exist_ok=True)
+
+        temp_folder_path = os.path.join("media", Path(temp_path).stem)
+        if os.path.exists(temp_folder_path):
+            for item in os.listdir(temp_folder_path):
+                s = os.path.join(temp_folder_path, item)
+                d = os.path.join(folder_path, item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
+            shutil.rmtree(temp_folder_path, ignore_errors=True)
+
         zip_path = f"temp_{namespace}"
         archive = shutil.make_archive(zip_path, "zip", folder_path)
 
@@ -30,7 +43,6 @@ async def convert(
 
         artifacts = base64.b64encode(zip_data).decode()
         os.remove(archive)
-        shutil.rmtree(folder_path, ignore_errors=True)
 
         return {"status": "success", "content": state, "artifacts": artifacts}
     except Exception as e:
