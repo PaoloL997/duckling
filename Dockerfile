@@ -23,7 +23,7 @@ RUN poetry install --only main --no-interaction --no-ansi
 
 RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
 
-# Force offline mode: all models are already cached in the layer above
+# Force offline for all models that are already cached in the layer above
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 
