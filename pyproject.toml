@@ -23,6 +23,7 @@ matplotlib = "^3.10.8"
 langgraph = "^1.0.6"
 fastapi = "^0.129.0"
 uvicorn = "^0.41.0"
+python-multipart = ">=0.0.22,<0.0.23"
 
 [[tool.poetry.source]]
 name = "pytorch"
@@ -40,5 +41,4 @@ dev = [
     "mypy (>=1.19.0,<2.0.0)",
     "interrogate (>=1.7.0,<2.0.0)",
     "dotenv (>=0.9.9,<0.10.0)",
-    "python-multipart (>=0.0.22,<0.0.23)"
 ]
