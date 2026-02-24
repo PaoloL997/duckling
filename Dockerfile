@@ -17,9 +17,11 @@ COPY pyproject.toml poetry.lock* README.md ./
 RUN poetry config virtualenvs.create false \
     && poetry install --only main --no-interaction --no-ansi --no-root
 
-RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
-
 COPY . .
+
+RUN poetry install --only main --no-interaction --no-ansi
+
+RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
 
 EXPOSE 8080
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
