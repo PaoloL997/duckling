@@ -24,7 +24,7 @@ RUN poetry install --only main --no-interaction --no-ansi
 RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
 RUN python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
 
-ENV HF_HUB_OFFLINE=1
+ENV HF_HUB_OFFLINE=0
 ENV TRANSFORMERS_OFFLINE=1
 
 EXPOSE 8080
