@@ -22,8 +22,8 @@ COPY . .
 RUN poetry install --only main --no-interaction --no-ansi
 
 RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
+RUN python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
 
-# Force offline for all models that are already cached in the layer above
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 
