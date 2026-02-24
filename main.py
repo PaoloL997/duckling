@@ -15,6 +15,8 @@ async def convert(
     file: UploadFile = File(...),
 ):
     temp_path = f"temp_{uuid.uuid4()}.pdf"
+    folder_path = None
+    archive = None
     try:
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -35,14 +37,10 @@ async def convert(
                     shutil.copy2(s, d)
             shutil.rmtree(temp_folder_path, ignore_errors=True)
 
-        zip_path = f"temp_{namespace}"
-        archive = shutil.make_archive(zip_path, "zip", folder_path)
+        archive = shutil.make_archive(f"temp_{namespace}", "zip", folder_path)
 
         with open(archive, "rb") as f:
-            zip_data = f.read()
-
-        artifacts = base64.b64encode(zip_data).decode()
-        os.remove(archive)
+            artifacts = base64.b64encode(f.read()).decode()
 
         return {"status": "success", "content": state, "artifacts": artifacts}
     except Exception as e:
@@ -50,6 +48,10 @@ async def convert(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+        if archive and os.path.exists(archive):
+            os.remove(archive)
+        if folder_path and os.path.exists(folder_path):
+            shutil.rmtree(folder_path, ignore_errors=True)
 
 
 @app.get("/health")
