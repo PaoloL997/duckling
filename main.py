@@ -7,7 +7,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from duckling.graph import DucklingGraph
 
 app = FastAPI(title="Duckling Document Extraction Service")
-converter = DucklingGraph()  # TODO: converter eseguito solo all'inizio
+converter = DucklingGraph()
 
 
 @app.post("/convert")
@@ -21,7 +21,7 @@ async def convert(
         namespace = Path(str(file.filename)).stem
         state = converter.run(path=temp_path, namespace=namespace)
 
-        folder_path = os.path.join("media", namespace)
+        folder_path = os.path.join("media", Path(temp_path).stem)
         zip_path = f"temp_{namespace}"
         archive = shutil.make_archive(zip_path, "zip", folder_path)
 
