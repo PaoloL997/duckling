@@ -2,6 +2,11 @@
 
 from pathlib import Path
 
+from transformers import AutoTokenizer
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from langgraph.graph import StateGraph, END
 
 from duckling.files.table import Table
@@ -42,7 +47,43 @@ class DucklingGraph:
         self.max_tokens = max_tokens
         self.tokenizer = tokenizer
         self.llm = llm
+        self._warmup()
         self.graph = self._compile()
+
+    def _warmup(self) -> None:
+        """Pre-load and cache all models required at runtime.
+
+        This method is intentionally called during __init__ so that the Docker
+        build step ``RUN python -c "from duckling.graph import DucklingGraph;
+        DucklingGraph()"`` triggers all HuggingFace / Docling downloads and
+        saves them to the local cache.  The container can then run fully
+        offline (``HF_HUB_OFFLINE=1``) without any network access.
+        """
+        print("[DucklingGraph] Warming up models...")
+
+        # 1. HuggingFace tokenizer (used by BaseConverter / HybridChunker)
+        print("[DucklingGraph]   - HuggingFace tokenizer")
+        AutoTokenizer.from_pretrained(self.tokenizer)
+
+        # 2. Docling DocumentConverter with full PDF pipeline
+        #    (downloads layout, OCR and formula-enrichment models)
+        print("[DucklingGraph]   - Docling PDF pipeline")
+        pipeline_options = PdfPipelineOptions(
+            generate_picture_images=True,
+            do_formula_enrichment=True,
+            images_scale=4,
+        )
+        pipeline_options.accelerator_options = AcceleratorOptions(
+            device=AcceleratorDevice.CUDA, num_threads=8
+        )
+        pipeline_options.do_ocr = True
+        DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+        )
+
+        print("[DucklingGraph] Warmup complete.")
 
     def _format_node(self, state: State) -> dict:
         """Determine the format of the input file.

@@ -23,5 +23,9 @@ RUN poetry install --only main --no-interaction --no-ansi
 
 RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
 
+# Force offline mode: all models are already cached in the layer above
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
 EXPOSE 8080
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
