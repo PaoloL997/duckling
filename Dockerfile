@@ -25,7 +25,7 @@ RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
 RUN python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
 
 ENV HF_HUB_OFFLINE=0
-ENV TRANSFORMERS_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=0
 
 EXPOSE 8080
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
