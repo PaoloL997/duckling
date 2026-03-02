@@ -10,10 +10,11 @@ ENV POETRY_VERSION=1.8.0
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="/root/.local/bin:$PATH"
 
-# Imposta la cache HF in una directory fissa nell'immagine
+# Cache directories
 ENV HF_HOME=/app/models
 ENV TRANSFORMERS_CACHE=/app/models
 ENV DOCLING_ARTIFACTS_PATH=/app/models
+ENV EASYOCR_MODULE_PATH=/app/models/EasyOcr
 
 WORKDIR /app
 
@@ -26,13 +27,16 @@ COPY . .
 
 RUN poetry install --only main --no-interaction --no-ansi
 
-# Download modelli esistenti
+# Download modelli duckling
 RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
-RUN python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
 
-# Pre-scarica i modelli Docling
-RUN python -c "from docling.document_converter import DocumentConverter, PdfFormatOption; from docling.datamodel.pipeline_options import PdfPipelineOptions; from docling.datamodel.base_models import InputFormat; pipeline_options = PdfPipelineOptions(do_ocr=True, generate_picture_images=True, do_formula_enrichment=True); converter = DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}); print('OK')"
-# A runtime forza l'uso della cache locale, niente chiamate a HF
+# Download modelli EasyOCR
+RUN python -c "import easyocr; reader = easyocr.Reader(['it', 'en'], model_storage_directory='/app/models/EasyOcr', download_enabled=True); print('EasyOCR models scaricati.')"
+
+# Download modelli Docling
+RUN python -c "from docling.document_converter import DocumentConverter, PdfFormatOption; from docling.datamodel.pipeline_options import PdfPipelineOptions; from docling.datamodel.base_models import InputFormat; pipeline_options = PdfPipelineOptions(do_ocr=True, generate_picture_images=True, do_formula_enrichment=True); converter = DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}); print('Modelli Docling scaricati correttamente.')"
+
+# A runtime usa solo la cache locale
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 
