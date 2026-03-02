@@ -1,6 +1,7 @@
 """Drawing PDF converter that produces structured technical descriptions."""
 
 from pathlib import Path
+from typing import Any
 import base64
 import fitz
 from langchain_core.documents import Document
@@ -96,21 +97,25 @@ class Draw:
         Returns:
             A list representing the message structure expected by the LLM.
         """
-        message = [
+
+        message: list[dict[str, Any]] = [
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": query,
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{image_str}"},
-                    },
+                    {"type": "text", "text": query},
                 ],
             }
         ]
+
+        # Only include the image_url entry when we actually have base64 data.
+        if image_str:
+            message[0]["content"].append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{image_str}"},
+                }
+            )
+
         return message
 
     def get_document(
