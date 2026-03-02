@@ -26,10 +26,10 @@ COPY . .
 
 RUN poetry install --only main --no-interaction --no-ansi
 
-# Crea la cartella per i modelli
-RUN mkdir -p /app/models
+# Crea le cartelle per i modelli
+RUN mkdir -p /app/models /app/models/EasyOcr
 
-# Download tutti i modelli (duckling, EasyOCR, Docling)
+# Download tutti i modelli (EasyOCR prima, poi Docling/HF)
 RUN python warmup.py
 
 # A runtime usa solo la cache locale
