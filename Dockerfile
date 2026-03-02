@@ -12,7 +12,6 @@ ENV PATH="/root/.local/bin:$PATH"
 
 # Cache directories
 ENV HF_HOME=/app/models
-ENV TRANSFORMERS_CACHE=/app/models
 ENV DOCLING_ARTIFACTS_PATH=/app/models
 ENV EASYOCR_MODULE_PATH=/app/models/EasyOcr
 
