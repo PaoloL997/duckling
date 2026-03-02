@@ -1,10 +1,10 @@
-from duckling.graph import DucklingGraph
+from duckling.files.pdf.convert import PDF
 
 
 def warmup():
-    graph = DucklingGraph()
-    state = graph.run(path="2408_09869v5.pdf")
-    print(state)
+    conv = PDF()
+    res = conv.load(path="2408_09869v5.pdf")
+    print(res)
 
 
 if __name__ == "__main__":
