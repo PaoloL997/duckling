@@ -31,17 +31,7 @@ RUN python -c "from duckling.graph import DucklingGraph; DucklingGraph()"
 RUN python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
 
 # Pre-scarica i modelli Docling
-RUN python -c "
-from docling.document_converter import DocumentConverter
-from docling.datamodel.pipeline_options import PipelineOptions
-
-pipeline_options = PipelineOptions()
-pipeline_options.do_ocr = True
-pipeline_options.do_table_structure = True
-
-converter = DocumentConverter()
-print('Modelli Docling scaricati correttamente.')
-"
+RUN python -c "from docling.document_converter import DocumentConverter; from docling.datamodel.pipeline_options import PipelineOptions; pipeline_options = PipelineOptions(); pipeline_options.do_ocr = True; pipeline_options.do_table_structure = True; converter = DocumentConverter(); print('Modelli Docling scaricati correttamente.')"
 
 # A runtime forza l'uso della cache locale, niente chiamate a HF
 ENV HF_HUB_OFFLINE=1
