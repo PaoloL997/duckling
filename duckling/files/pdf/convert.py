@@ -4,17 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from docling_core.types.doc.document import ImageRefMode
 
-# Group docling imports together
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.datamodel.base_models import InputFormat
 from docling.datamodel.document import DoclingDocument
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 
+from duckling.service import CloudService
 from duckling.files.pdf.options import ImageOptions
-from duckling.utils import copy_source_file, create_source
 from duckling.files.pdf.describe import DescribeImages
 from duckling.base import BaseConverter
 
@@ -41,42 +35,7 @@ class PDF(BaseConverter):
         )
         self.llm = ChatOpenAI(model=model)
         self.describe = DescribeImages(model=model, max_tokens=context_window)
-
-    def load(self, path: str):
-        """Load a PDF using docling with PDF-specific options.
-
-        Args:
-            path: Path to the PDF file.
-
-        Returns:
-            A `DoclingDocument` produced by the converter.
-        """
-        pipeline_options = PdfPipelineOptions(
-            generate_picture_images=True, do_formula_enrichment=True, images_scale=4
-        )
-        accel_opts = AcceleratorOptions(device=AcceleratorDevice.CUDA, num_threads=8)
-        pipeline_options.accelerator_options = accel_opts
-        pipeline_options.do_ocr = True
-        converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-            }
-        )
-        return converter.convert(source=path).document
-
-    def save_as_markdown(self, document: DoclingDocument, md_filepath: Path):
-        """Save the DoclingDocument as a markdown file with referenced images.
-
-        Args:
-            document: The `DoclingDocument` to save.
-            md_filepath: Destination markdown filepath.
-        """
-        document.save_as_markdown(
-            filename=str(md_filepath),
-            image_mode=ImageRefMode.REFERENCED,
-            artifacts_dir=Path("artifacts"),
-            include_annotations=False,
-        )
+        self.cloud = CloudService()
 
     @staticmethod
     def filter_images(
@@ -122,12 +81,11 @@ class PDF(BaseConverter):
         Returns:
             A list of `Document` objects extracted from the PDF.
         """
-        source = create_source(path)
-        copy_source_file(path, source)
-        document = self.load(path)
+        source = Path("media") / Path(path).stem
+        document = self.cloud.load_pdf(path)
         text_chunks = self.chunk(document, namespace=namespace)
+
         md_filepath = source / f"{Path(path).stem}.md"
-        self.save_as_markdown(document, md_filepath)
         with open(md_filepath, "r", encoding="utf-8") as f:
             markdown_content = f.read()
 
@@ -141,7 +99,10 @@ class PDF(BaseConverter):
         image_chunks = []
         if any((source / "artifacts").iterdir()):
             image_chunks = self.describe.run(
-                markdown=cleaned_markdown, source=source, path=path, namespace=namespace
+                markdown=cleaned_markdown,
+                source=str(source),
+                path=path,
+                namespace=namespace,
             )
         chunks = text_chunks + image_chunks
         return chunks
