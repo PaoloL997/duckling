@@ -78,9 +78,7 @@ class DucklingGraph:
         Returns:
             Dict containing `documents` extracted from the PDF.
         """
-        converter = PDF(
-            max_tokens=self.max_tokens, tokenizer=self.tokenizer, model=self.llm
-        )
+        converter = PDF(model=self.llm)
         documents = converter.convert(
             path=str(state["input"]), namespace=state["namespace"]
         )
