@@ -11,6 +11,7 @@ from duckling.service import CloudService
 from duckling.base import BaseConverter
 from duckling.files.pdf.options import ImageOptions
 from duckling.files.pdf.describe import DescribeImages
+from duckling.utils import copy_source_file
 
 load_dotenv()
 
@@ -78,6 +79,7 @@ class PDF:
         """
         source = Path("media") / Path(path).stem
         document = self.cloud.load_pdf(path)
+        copy_source_file(path, source)
 
         text_chunks = self.base.chunk(document=document, namespace=namespace)
         md_filepath = source / f"{Path(path).stem}.md"
