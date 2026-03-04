@@ -3,13 +3,16 @@
 from typing import List
 from pathlib import Path
 
+from transformers import AutoTokenizer
+
 from docling_core.transforms.chunker.hierarchical_chunker import (
-    HierarchicalChunker,
     ChunkingDocSerializer,
     ChunkingSerializerProvider,
 )
 from docling_core.transforms.serializer.markdown import MarkdownTableSerializer
 from docling_core.types.doc import DoclingDocument
+from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
+from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 
 from docling.document_converter import DocumentConverter
 
@@ -21,12 +24,12 @@ load_dotenv()
 
 
 class MDTableSerializerProvider(ChunkingSerializerProvider):
-    """Serializer provider che usa Markdown per le tabelle."""
+    """Custom serializer provider that configures a Markdown table serializer."""
 
     def get_serializer(self, doc):
         return ChunkingDocSerializer(
             doc=doc,
-            table_serializer=MarkdownTableSerializer(),
+            table_serializer=MarkdownTableSerializer(),  # configuring a different table serializer
         )
 
 
@@ -39,8 +42,17 @@ class BaseConverter:
 
     def __init__(self):
         """Initialize the base converter."""
-        self.chunker = HierarchicalChunker(
-            serializer_provider=MDTableSerializerProvider()
+        self.tokenizer = HuggingFaceTokenizer(
+            tokenizer=AutoTokenizer.from_pretrained(
+                "sentence-transformers/all-MiniLM-L6-v2"
+            ),
+            max_tokens=4096,
+        )
+
+        self.chunker = HybridChunker(
+            tokenizer=self.tokenizer,
+            merge_peers=True,
+            serializer_provider=MDTableSerializerProvider(),
         )
 
     def load(self, path: str) -> DoclingDocument:
