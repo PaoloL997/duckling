@@ -3,32 +3,16 @@
 from pathlib import Path
 
 from dotenv import load_dotenv
-from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 
 from docling.datamodel.document import DoclingDocument
-from docling_core.transforms.chunker.hierarchical_chunker import (
-    HierarchicalChunker,
-    ChunkingDocSerializer,
-    ChunkingSerializerProvider,
-)
-from docling_core.transforms.serializer.markdown import MarkdownTableSerializer
 
 from duckling.service import CloudService
+from duckling.base import BaseConverter
 from duckling.files.pdf.options import ImageOptions
 from duckling.files.pdf.describe import DescribeImages
 
 load_dotenv()
-
-
-class MDTableSerializerProvider(ChunkingSerializerProvider):
-    """Serializer provider che usa Markdown per le tabelle."""
-
-    def get_serializer(self, doc):
-        return ChunkingDocSerializer(
-            doc=doc,
-            table_serializer=MarkdownTableSerializer(),
-        )
 
 
 class PDF:
@@ -46,6 +30,7 @@ class PDF:
         self.llm = ChatOpenAI(model=model)
         self.describe = DescribeImages(model=model, max_tokens=context_window)
         self.cloud = CloudService()
+        self.base = BaseConverter()
 
     @staticmethod
     def filter_images(
@@ -94,30 +79,16 @@ class PDF:
         source = Path("media") / Path(path).stem
         document = self.cloud.load_pdf(path)
 
-        chunker = HierarchicalChunker(serializer_provider=MDTableSerializerProvider())
-        text_chunks = [
-            Document(
-                page_content=chunker.contextualize(raw_chunk),
-                metadata={
-                    "source": path,
-                    "namespace": namespace,
-                },
-            )
-            for raw_chunk in chunker.chunk(document)
-            if chunker.contextualize(raw_chunk).strip()
-        ]
-
+        text_chunks = self.base.chunk(document=document, namespace=namespace)
         md_filepath = source / f"{Path(path).stem}.md"
         with open(md_filepath, "r", encoding="utf-8") as f:
             markdown_content = f.read()
-
         cleaned_markdown = self.filter_images(
             document=document,
             content=markdown_content,
             source=source,
             md_filepath=md_filepath,
         )
-
         image_chunks = []
         if any((source / "artifacts").iterdir()):
             image_chunks = self.describe.run(

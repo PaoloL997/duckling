@@ -3,16 +3,31 @@
 from typing import List
 from pathlib import Path
 
-from transformers import AutoTokenizer
-from docling.chunking import HybridChunker
-from docling.document_converter import DocumentConverter
+from docling_core.transforms.chunker.hierarchical_chunker import (
+    HierarchicalChunker,
+    ChunkingDocSerializer,
+    ChunkingSerializerProvider,
+)
+from docling_core.transforms.serializer.markdown import MarkdownTableSerializer
 from docling_core.types.doc import DoclingDocument
-from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+
+from docling.document_converter import DocumentConverter
+
 from langchain_core.documents import Document
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class MDTableSerializerProvider(ChunkingSerializerProvider):
+    """Serializer provider che usa Markdown per le tabelle."""
+
+    def get_serializer(self, doc):
+        return ChunkingDocSerializer(
+            doc=doc,
+            table_serializer=MarkdownTableSerializer(),
+        )
 
 
 class BaseConverter:
@@ -22,26 +37,10 @@ class BaseConverter:
     DocumentConverter and split them into token-aware chunks.
     """
 
-    def __init__(
-        self,
-        max_tokens: int = 4096,
-        tokenizer: str = "sentence-transformers/all-MiniLM-L6-v2",
-    ):
-        """Initialize the base converter.
-
-        Args:
-            max_tokens: Maximum tokens for chunking.
-            tokenizer: HuggingFace tokenizer identifier.
-        """
-        self.max_tokens = max_tokens
-        self.tokenizer = HuggingFaceTokenizer(
-            tokenizer=AutoTokenizer.from_pretrained(tokenizer),
-            max_tokens=max_tokens,
-        )
-
-        self.chunker = HybridChunker(
-            tokenizer=self.tokenizer,
-            merge_peers=True,
+    def __init__(self):
+        """Initialize the base converter."""
+        self.chunker = HierarchicalChunker(
+            serializer_provider=MDTableSerializerProvider()
         )
 
     def load(self, path: str) -> DoclingDocument:
@@ -96,7 +95,6 @@ class BaseConverter:
                     )
                 )
         else:
-            # Standard text chunking
             chunks = list(self.chunker.chunk(dl_doc=document))
 
             for chunk in chunks:
