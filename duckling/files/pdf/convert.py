@@ -3,19 +3,35 @@
 from pathlib import Path
 
 from dotenv import load_dotenv
+from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 
 from docling.datamodel.document import DoclingDocument
+from docling_core.transforms.chunker.hierarchical_chunker import (
+    HierarchicalChunker,
+    ChunkingDocSerializer,
+    ChunkingSerializerProvider,
+)
+from docling_core.transforms.serializer.markdown import MarkdownTableSerializer
 
 from duckling.service import CloudService
 from duckling.files.pdf.options import ImageOptions
 from duckling.files.pdf.describe import DescribeImages
-from duckling.base import BaseConverter
 
 load_dotenv()
 
 
-class PDF(BaseConverter):
+class MDTableSerializerProvider(ChunkingSerializerProvider):
+    """Serializer provider che usa Markdown per le tabelle."""
+
+    def get_serializer(self, doc):
+        return ChunkingDocSerializer(
+            doc=doc,
+            table_serializer=MarkdownTableSerializer(),
+        )
+
+
+class PDF:
     """PDF converter that extracts text and images into documents.
 
     Uses docling to convert PDFs, saves markdown, filters images, and
@@ -24,15 +40,9 @@ class PDF(BaseConverter):
 
     def __init__(
         self,
-        max_tokens: int = 4996,
         context_window: int = 900_000,
-        tokenizer: str = "sentence-transformers/all-MiniLM-L6-v2",
         model: str = "gpt-4.1-nano",
     ):
-        super().__init__(
-            max_tokens=max_tokens,
-            tokenizer=tokenizer,
-        )
         self.llm = ChatOpenAI(model=model)
         self.describe = DescribeImages(model=model, max_tokens=context_window)
         self.cloud = CloudService()
@@ -83,7 +93,19 @@ class PDF(BaseConverter):
         """
         source = Path("media") / Path(path).stem
         document = self.cloud.load_pdf(path)
-        text_chunks = self.chunk(document, namespace=namespace)
+
+        chunker = HierarchicalChunker(serializer_provider=MDTableSerializerProvider())
+        text_chunks = [
+            Document(
+                page_content=chunker.contextualize(raw_chunk),
+                metadata={
+                    "source": path,
+                    "namespace": namespace,
+                },
+            )
+            for raw_chunk in chunker.chunk(document)
+            if chunker.contextualize(raw_chunk).strip()
+        ]
 
         md_filepath = source / f"{Path(path).stem}.md"
         with open(md_filepath, "r", encoding="utf-8") as f:
@@ -104,5 +126,5 @@ class PDF(BaseConverter):
                 path=path,
                 namespace=namespace,
             )
-        chunks = text_chunks + image_chunks
-        return chunks
+
+        return text_chunks + image_chunks
