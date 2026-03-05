@@ -81,72 +81,56 @@ class BaseConverter:
         """
         docs = []
 
-        # Handle tables if document has no text content
-        if len(document.texts) == 0 and len(document.tables) > 0:
-            # For table-only documents, chunk tables directly
-            for table_idx, table in enumerate(document.tables):
-                # Convert table to markdown for better readability
-                table_content = table.export_to_markdown(doc=document)
+        chunks = list(self.chunker.chunk(dl_doc=document))
 
-                filename = document.name or "table"
-                relative_path = str(
-                    (Path("media") / filename / f"table_{table_idx}.md").as_posix()
+        for chunk in chunks:
+            content = self.chunker.contextualize(chunk=chunk)
+            filepath = (
+                chunk.meta.origin.filename
+                if hasattr(chunk.meta, "origin")
+                else "unknown"
+            )
+            filename = Path(filepath).name
+            try:
+                page_start = (
+                    chunk.meta.doc_items[0].prov[0].page_no
+                    if hasattr(chunk.meta, "doc_items")
+                    else "N/A"
                 )
+                page_end = (
+                    chunk.meta.doc_items[-1].prov[-1].page_no
+                    if hasattr(chunk.meta, "doc_items")
+                    else "N/A"
+                )
+            except Exception:
+                page_start = "N/A"
+                page_end = "N/A"
 
-                docs.append(
-                    Document(
-                        page_content=table_content,
-                        metadata={
-                            "path": relative_path,
-                            "page_start": "N/A",
-                            "page_end": "N/A",
-                            "type": "table",
-                            "name": f"table_{table_idx}",
-                            "namespace": namespace,
-                        },
-                    )
+            relative_path = str(
+                (Path("media") / Path(filename).stem / filename).as_posix()
+            )
+            # Detect whether the chunk originates from a table
+            try:
+                item_labels = {
+                    item.label
+                    for item in chunk.meta.doc_items
+                    if hasattr(item, "label")
+                }
+                chunk_type = "table" if "table" in item_labels else "text"
+            except Exception:
+                chunk_type = "text"
+            docs.append(
+                Document(
+                    page_content=content,
+                    metadata={
+                        "path": relative_path,
+                        "page_start": str(page_start),
+                        "page_end": str(page_end),
+                        "type": chunk_type,
+                        "name": filename,
+                        "namespace": namespace,
+                    },
                 )
-        else:
-            chunks = list(self.chunker.chunk(dl_doc=document))
-
-            for chunk in chunks:
-                content = self.chunker.contextualize(chunk=chunk)
-                filepath = (
-                    chunk.meta.origin.filename
-                    if hasattr(chunk.meta, "origin")
-                    else "unknown"
-                )
-                filename = Path(filepath).name
-                try:
-                    page_start = (
-                        chunk.meta.doc_items[0].prov[0].page_no
-                        if hasattr(chunk.meta, "doc_items")
-                        else "N/A"
-                    )
-                    page_end = (
-                        chunk.meta.doc_items[-1].prov[-1].page_no
-                        if hasattr(chunk.meta, "doc_items")
-                        else "N/A"
-                    )
-                except Exception:
-                    page_start = "N/A"
-                    page_end = "N/A"
-
-                relative_path = str(
-                    (Path("media") / Path(filename).stem / filename).as_posix()
-                )
-                docs.append(
-                    Document(
-                        page_content=content,
-                        metadata={
-                            "path": relative_path,
-                            "page_start": str(page_start),
-                            "page_end": str(page_end),
-                            "type": "text",
-                            "name": filename,
-                            "namespace": namespace,
-                        },
-                    )
-                )
+            )
 
         return docs
