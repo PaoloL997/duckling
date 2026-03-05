@@ -11,12 +11,8 @@ class Table(BaseConverter):
     Inherits chunking and loading behavior from `BaseConverter`.
     """
 
-    def __init__(
-        self,
-        max_tokens: int = 4996,
-        tokenizer: str = "sentence-transformers/all-MiniLM-L6-v2",
-    ):
-        super().__init__(max_tokens=max_tokens, tokenizer=tokenizer)
+    def __init__(self):
+        super().__init__()
         self.service = CloudService()
 
     def convert(self, path: str, namespace: str = "namespace"):

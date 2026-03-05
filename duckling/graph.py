@@ -140,7 +140,7 @@ class DucklingGraph:
         Returns:
             Dict containing `documents` extracted from the table.
         """
-        converter = Table(max_tokens=self.max_tokens, tokenizer=self.tokenizer)
+        converter = Table()
         documents = converter.convert(
             path=str(state["input"]), namespace=state["namespace"]
         )
