@@ -43,7 +43,7 @@ class CloudService:
     TO_FORMATS = ["json", "md"]
     IMAGE_EXPORT_MODE = "referenced"
     PIPELINE = "standard"
-    OCR_ENGINE = "tesseract"
+    OCR_ENGINE = "easyocr"  # Tesseract or RapidOCR
     FORCE_OCR = "true"
     TABLE_MODE = "accurate"
     IMAGES_SCALE = "4.0"
