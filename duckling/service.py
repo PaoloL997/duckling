@@ -101,6 +101,7 @@ class CloudService:
                     "table_mode": self.TABLE_MODE,
                     "images_scale": self.IMAGES_SCALE,
                     "do_formula_enrichment": self.DO_FORMULA_ENRICHMENT,
+                    "num_threads": 8,
                 },
                 timeout=60,  # only the *submission* needs a short timeout
             )
