@@ -2,7 +2,7 @@
 
 from duckling.base import BaseConverter
 from duckling.utils import copy_source_file, create_source
-from duckling.service import CloudService
+from duckling.service import LocalService
 
 
 class Table(BaseConverter):
@@ -13,7 +13,7 @@ class Table(BaseConverter):
 
     def __init__(self):
         super().__init__()
-        self.service = CloudService()
+        self.service = LocalService()
 
     def convert(self, path: str, namespace: str = "namespace"):
         """Convert a table file into a list of document chunks.

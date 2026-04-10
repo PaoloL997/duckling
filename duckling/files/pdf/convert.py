@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 
 from docling.datamodel.document import DoclingDocument
 
-from duckling.service import CloudService
+from duckling.service import LocalService
 from duckling.base import BaseConverter
 from duckling.files.pdf.options import ImageOptions
 from duckling.files.pdf.describe import DescribeImages
@@ -30,7 +30,7 @@ class PDF:
     ):
         self.llm = ChatOpenAI(model=model)
         self.describe = DescribeImages(model=model, max_tokens=context_window)
-        self.cloud = CloudService()
+        self.service = LocalService()
         self.base = BaseConverter()
 
     @staticmethod
@@ -78,7 +78,7 @@ class PDF:
             A list of `Document` objects extracted from the PDF.
         """
         source = Path("media") / Path(path).stem
-        document = self.cloud.load_pdf(path)
+        document = self.service.load_pdf(path)
         copy_source_file(path, source)
 
         text_chunks = self.base.chunk(document=document, namespace=namespace)
