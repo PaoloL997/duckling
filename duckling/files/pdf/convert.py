@@ -92,7 +92,8 @@ class PDF:
             md_filepath=md_filepath,
         )
         image_chunks = []
-        if any((source / "artifacts").iterdir()):
+        artifacts_dir = source / "artifacts"
+        if artifacts_dir.is_dir() and any(artifacts_dir.iterdir()):
             image_chunks = self.describe.run(
                 markdown=cleaned_markdown,
                 source=str(source),
