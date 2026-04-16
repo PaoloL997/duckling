@@ -51,6 +51,19 @@ class LocalService:
     IMAGES_SCALE = "4.0"
     DO_FORMULA_ENRICHMENT = "true"
 
+    @staticmethod
+    def _validate_document(json_content: dict) -> DoclingDocument:
+        """Validate a Docling JSON payload against the local SDK schema.
+
+        The local environment currently uses schema 1.9.0, while the service
+        can return 1.10.0 for markdown conversions. Normalizing the top-level
+        version keeps the payload compatible with the installed SDK.
+        """
+        normalized = dict(json_content)
+        if normalized.get("version") == "1.10.0":
+            normalized["version"] = "1.9.0"
+        return DoclingDocument.model_validate(normalized)
+
     def healthcheck(self) -> bool:
         """Ping /health to verify the local container is reachable.
 
@@ -58,11 +71,11 @@ class LocalService:
             True if the service is healthy, False otherwise.
         """
         url = f"{SERVICE_URL}/health"
-        print("Checking local docling-serve …", end=" ", flush=True)
+        print("Checking local docling-serve...", end=" ", flush=True)
         try:
             resp = requests.get(url, timeout=HEALTHCHECK_TIMEOUT_S)
             resp.raise_for_status()
-            print("ready ✓")
+            print("ready")
             return True
         except requests.RequestException as exc:
             print(f"healthcheck failed ({exc})")
@@ -169,7 +182,7 @@ class LocalService:
             json_file = next(f for f in z.namelist() if f.endswith(".json"))
             json_content = json.loads(z.read(json_file))
 
-        return DoclingDocument.model_validate(json_content)
+        return self._validate_document(json_content)
 
     def load_table(self, path: str) -> DoclingDocument:
         """Convert a CSV/XLSX → DoclingDocument (sync with retry)."""
@@ -187,7 +200,7 @@ class LocalService:
                     )
                 response.raise_for_status()
                 json_content = response.json()["document"]["json_content"]
-                return DoclingDocument.model_validate(json_content)
+                return self._validate_document(json_content)
 
             except requests.RequestException as exc:
                 last_exc = exc
@@ -201,3 +214,33 @@ class LocalService:
         raise LocalServiceError(
             f"load_table failed after {MAX_SYNC_RETRIES} attempts"
         ) from last_exc
+
+    def load_textual(self, path: str) -> DoclingDocument:
+        """Convert a TXT/MD file via the local service sync endpoint.
+
+        The backend supports markdown but not plain txt, so txt files are sent
+        as markdown-compatible plain text content.
+        """
+        suffix = Path(path).suffix.lower().lstrip(".")
+        if suffix not in ["txt", "md"]:
+            raise LocalServiceError(f"Unsupported text file format: {suffix}")
+
+        self.healthcheck()
+
+        from_format = "md"
+        mime_type = "text/markdown"
+        filename = Path(path).name if suffix == "md" else f"{Path(path).stem}.md"
+
+        with open(path, "rb") as f:
+            payload = f.read()
+
+        with io.BytesIO(payload) as file_obj:
+            response = requests.post(
+                f"{SERVICE_URL}/v1/convert/file",
+                files={"files": (filename, file_obj, mime_type)},
+                data={"to_formats": "json", "from_formats": from_format},
+                timeout=120,
+            )
+        response.raise_for_status()
+        json_content = response.json()["document"]["json_content"]
+        return self._validate_document(json_content)

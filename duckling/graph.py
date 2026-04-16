@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, END
 
 from duckling.files.table import Table
 from duckling.files.image import Image
+from duckling.files.text import Text
 from duckling.files.pdf.convert import PDF
 from duckling.files.pdf.draw import Draw
 from duckling.utils import is_a4, get_types_count
@@ -16,6 +17,7 @@ ACCEPTED_FORMATS = {
     "image": [".png", ".jpg", ".jpeg"],
     "table": [".csv", ".xlsx"],
     "pdf": [".pdf"],
+    "text": [".txt", ".md"],
 }
 
 
@@ -146,6 +148,21 @@ class DucklingGraph:
         )
         return {"documents": documents}
 
+    def _text(self, state: State) -> dict:
+        """Convert a text file into a document.
+
+        Args:
+            state: Current processing state.
+
+        Returns:
+            Dict containing `documents` extracted from the text file.
+        """
+        converter = Text()
+        documents = converter.convert(
+            path=str(state["input"]), namespace=state["namespace"]
+        )
+        return {"documents": documents}
+
     def _compile(self):
         """Build and compile the internal StateGraph.
 
@@ -161,13 +178,13 @@ class DucklingGraph:
         graph.add_node("drawing_pdf", self._drawing_pdf)
         graph.add_node("image", self._image)
         graph.add_node("table", self._table)
+        graph.add_node("text", self._text)
 
         graph.set_entry_point("format")
 
         graph.add_conditional_edges(
             "format",
             lambda state: state["format"],
-            {"pdf": "pdf", "image": "image", "table": "table"},
         )
 
         graph.add_conditional_edges(
@@ -197,6 +214,7 @@ class DucklingGraph:
         )
         graph.add_edge("image", END)
         graph.add_edge("table", END)
+        graph.add_edge("text", END)
 
         return graph.compile()
 
