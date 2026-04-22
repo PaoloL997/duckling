@@ -177,6 +177,7 @@ class LocalService:
 
         os.makedirs("media", exist_ok=True)
         filename = Path(path).stem
+        os.makedirs(Path("media") / filename, exist_ok=True)
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
             z.extractall(Path("media") / filename)
             json_file = next(f for f in z.namelist() if f.endswith(".json"))
