@@ -2,6 +2,7 @@
 
 import re
 import json
+import logging
 from pathlib import Path
 
 import tiktoken
@@ -10,6 +11,8 @@ from langchain_core.messages import HumanMessage
 from langchain_core.documents import Document
 
 from duckling.utils import file_to_base64
+
+logger = logging.getLogger(__name__)
 
 DESCRIPTION_PROMPT = """
 You are given the following markdown content extracted from a PDF document.
@@ -94,8 +97,9 @@ class DescribeImages:
         Returns:
             Clean JSON string suitable for parsing.
         """
-        content = re.sub(r"```json\s*", "", content)
-        content = re.sub(r"```\s*$", "", content)
+        match = re.search(r"```json\s*(.*?)```", content, re.DOTALL)
+        if match:
+            return match.group(1).strip()
         return content.strip()
 
     def extract_descriptions(self, chunks: list):
@@ -112,7 +116,13 @@ class DescribeImages:
             query = DESCRIPTION_PROMPT.format(markdown_content=chunk)
             response = self.llm.invoke([HumanMessage(content=query)])
             cleaned = self.clean_json_response(str(response.content))
-            chunk_images = json.loads(cleaned)
+            try:
+                chunk_images = json.loads(cleaned)
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    "Failed to parse LLM response as JSON, skipping chunk: %s", e
+                )
+                continue
             if isinstance(chunk_images, list):
                 descriptions.extend(chunk_images)
         return descriptions
