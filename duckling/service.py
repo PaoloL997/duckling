@@ -2,6 +2,7 @@
 
 import io
 import json
+import logging
 import os
 import time
 import zipfile
@@ -13,6 +14,8 @@ from docling.datamodel.document import DoclingDocument
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 SERVICE_URL = os.getenv("DOCLING_SERVE_URL", "http://localhost:5001")
 
@@ -75,14 +78,14 @@ class LocalService:
             True if the service is healthy, False otherwise.
         """
         url = f"{SERVICE_URL}/health"
-        print("Checking local docling-serve...", end=" ", flush=True)
+        logger.info("Checking local docling-serve...")
         try:
             resp = requests.get(url, timeout=HEALTHCHECK_TIMEOUT_S)
             resp.raise_for_status()
-            print("ready")
+            logger.info("docling-serve ready")
             return True
         except requests.RequestException as exc:
-            print(f"healthcheck failed ({exc})")
+            logger.warning("healthcheck failed (%s)", exc)
             return False
 
     def _submit_async(self, path: str) -> str:
@@ -109,7 +112,7 @@ class LocalService:
         task_id = response.json().get("task_id")
         if not task_id:
             raise LocalServiceError(f"No task_id in response: {response.text}")
-        print(f"Task submitted → id={task_id}")
+        logger.info("Task submitted → id=%s", task_id)
         return task_id
 
     def _poll_until_done(self, task_id: str) -> None:
@@ -151,10 +154,12 @@ class LocalService:
                         POLL_BACKOFF_BASE_S * (2 ** (consecutive_errors - 1)),
                         POLL_BACKOFF_MAX_S,
                     )
-                    print(
-                        f"Poll transient error ({exc.__class__.__name__}): "
-                        f"retry {consecutive_errors}/{MAX_CONSECUTIVE_POLL_ERRORS} "
-                        f"in {backoff}s"
+                    logger.warning(
+                        "Poll transient error (%s): retry %d/%d in %ds",
+                        exc.__class__.__name__,
+                        consecutive_errors,
+                        MAX_CONSECUTIVE_POLL_ERRORS,
+                        backoff,
                     )
                     time.sleep(backoff)
                     continue
@@ -246,9 +251,12 @@ class LocalService:
             except requests.RequestException as exc:
                 last_exc = exc
                 wait = 2**attempt  # 2 s, 4 s, 8 s
-                print(
-                    f"load_table attempt {attempt}/{MAX_SYNC_RETRIES} failed "
-                    f"({exc}). Retrying in {wait}s …"
+                logger.warning(
+                    "load_table attempt %d/%d failed (%s). Retrying in %ds …",
+                    attempt,
+                    MAX_SYNC_RETRIES,
+                    exc,
+                    wait,
                 )
                 time.sleep(wait)
 

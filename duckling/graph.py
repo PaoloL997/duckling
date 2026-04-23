@@ -1,5 +1,6 @@
 """Routing graph that dispatches files to appropriate converters."""
 
+import logging
 from pathlib import Path
 
 from langgraph.graph import StateGraph, END
@@ -11,6 +12,9 @@ from duckling.files.pdf.convert import PDF
 from duckling.files.pdf.draw import Draw
 from duckling.utils import is_a4, get_types_count
 from duckling.state import State
+
+
+logger = logging.getLogger(__name__)
 
 
 ACCEPTED_FORMATS = {
@@ -109,12 +113,13 @@ class DucklingGraph:
             Empty dict; the graph uses conditional edges to decide next step.
         """
         types_count = get_types_count(state.get("documents", []))
-        print(f"Document types count: {types_count}")
+        logger.info("Document types count: %s", types_count)
 
         # Check if we have text documents - if not, we'll fallback to drawing PDF
         if len(state.get("documents", [])) == 0 or types_count.get("text", 0) == 0:
-            print(
-                "No text documents extracted from standard PDF conversion. Falling back to drawing-based conversion."
+            logger.warning(
+                "No text documents extracted from standard PDF conversion. "
+                "Falling back to drawing-based conversion."
             )
         return {}
 
