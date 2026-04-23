@@ -20,7 +20,6 @@ SERVICE_URL = os.getenv("DOCLING_SERVE_URL", "http://localhost:5001")
 LONG_POLL_WAIT_S = 30  # seconds the server holds the connection per poll request
 POLL_READ_TIMEOUT_S = LONG_POLL_WAIT_S + 30  # read timeout per single poll request
 POLL_TIMEOUT_S = 6 * 3600  # hard cap: max total wait time across all polls
-NO_PROGRESS_TIMEOUT_S = 600  # abort if num_processed does not advance for this long
 MAX_CONSECUTIVE_POLL_ERRORS = 5  # max consecutive transient poll failures tolerated
 POLL_BACKOFF_BASE_S = 2  # base for exponential backoff between poll retries
 POLL_BACKOFF_MAX_S = 30  # cap for the exponential backoff between poll retries
@@ -116,18 +115,19 @@ class LocalService:
     def _poll_until_done(self, task_id: str) -> None:
         """Block until the task reaches 'success' using server-side long-polling.
 
-        Resilience strategy (hybrid):
+        Resilience strategy:
         - Hard cap on total wait time (`POLL_TIMEOUT_S`) as a safety net.
-        - No-progress watchdog: abort if `num_processed` does not advance for
-          `NO_PROGRESS_TIMEOUT_S` seconds, regardless of total elapsed time.
         - Transient network errors (timeouts, connection drops) are retried
-          with exponential backoff and do NOT count as "no progress", since
-          the backend task is likely still running.
+          with exponential backoff instead of killing the job, because the
+          backend task is likely still running on the server.
+
+        Note: we intentionally do NOT implement a "no-progress" watchdog on
+        `task_meta.num_processed`, because that counter tracks the number of
+        DOCUMENTS processed (not pages). For single-file submissions it stays
+        at 0 until the very end, which would produce false positives.
         """
         start = time.monotonic()
         deadline = start + POLL_TIMEOUT_S
-        last_progress_at = start
-        last_num_processed = -1
         consecutive_errors = 0
         progress: tqdm | None = None
 
@@ -171,7 +171,7 @@ class LocalService:
                     progress = tqdm(
                         total=num_docs,
                         desc="Converting",
-                        unit="page",
+                        unit="doc",
                         dynamic_ncols=True,
                     )
 
@@ -179,17 +179,6 @@ class LocalService:
                     progress.n = num_processed
                     progress.set_postfix(status=task_status)
                     progress.refresh()
-
-                now = time.monotonic()
-                if num_processed != last_num_processed:
-                    last_num_processed = num_processed
-                    last_progress_at = now
-                elif now - last_progress_at > NO_PROGRESS_TIMEOUT_S:
-                    raise LocalServiceError(
-                        f"Task {task_id}: no progress for "
-                        f"{NO_PROGRESS_TIMEOUT_S}s (stuck at "
-                        f"{num_processed}/{num_docs})"
-                    )
 
                 if task_status == "success":
                     if progress is not None:
