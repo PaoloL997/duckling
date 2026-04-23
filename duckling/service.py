@@ -18,7 +18,12 @@ SERVICE_URL = os.getenv("DOCLING_SERVE_URL", "http://localhost:5001")
 
 # Tuneable constants
 LONG_POLL_WAIT_S = 30  # seconds the server holds the connection per poll request
-POLL_TIMEOUT_S = 3600  # max total wait time across all polls
+POLL_READ_TIMEOUT_S = LONG_POLL_WAIT_S + 30  # read timeout per single poll request
+POLL_TIMEOUT_S = 6 * 3600  # hard cap: max total wait time across all polls
+NO_PROGRESS_TIMEOUT_S = 600  # abort if num_processed does not advance for this long
+MAX_CONSECUTIVE_POLL_ERRORS = 5  # max consecutive transient poll failures tolerated
+POLL_BACKOFF_BASE_S = 2  # base for exponential backoff between poll retries
+POLL_BACKOFF_MAX_S = 30  # cap for the exponential backoff between poll retries
 HEALTHCHECK_TIMEOUT_S = 10  # timeout for the /health ping
 MAX_SYNC_RETRIES = 3  # retries for the table (sync) endpoint
 
@@ -109,18 +114,52 @@ class LocalService:
         return task_id
 
     def _poll_until_done(self, task_id: str) -> None:
-        """Block until the task reaches 'success' using server-side long-polling."""
-        deadline = time.monotonic() + POLL_TIMEOUT_S
+        """Block until the task reaches 'success' using server-side long-polling.
+
+        Resilience strategy (hybrid):
+        - Hard cap on total wait time (`POLL_TIMEOUT_S`) as a safety net.
+        - No-progress watchdog: abort if `num_processed` does not advance for
+          `NO_PROGRESS_TIMEOUT_S` seconds, regardless of total elapsed time.
+        - Transient network errors (timeouts, connection drops) are retried
+          with exponential backoff and do NOT count as "no progress", since
+          the backend task is likely still running.
+        """
+        start = time.monotonic()
+        deadline = start + POLL_TIMEOUT_S
+        last_progress_at = start
+        last_num_processed = -1
+        consecutive_errors = 0
         progress: tqdm | None = None
 
         try:
             while time.monotonic() < deadline:
-                resp = requests.get(
-                    f"{SERVICE_URL}/v1/status/poll/{task_id}",
-                    params={"wait": LONG_POLL_WAIT_S},
-                    timeout=LONG_POLL_WAIT_S + 10,
-                )
-                resp.raise_for_status()
+                try:
+                    resp = requests.get(
+                        f"{SERVICE_URL}/v1/status/poll/{task_id}",
+                        params={"wait": LONG_POLL_WAIT_S},
+                        timeout=POLL_READ_TIMEOUT_S,
+                    )
+                    resp.raise_for_status()
+                except (requests.Timeout, requests.ConnectionError) as exc:
+                    consecutive_errors += 1
+                    if consecutive_errors > MAX_CONSECUTIVE_POLL_ERRORS:
+                        raise LocalServiceError(
+                            f"Task {task_id}: lost contact with service after "
+                            f"{consecutive_errors} consecutive poll errors ({exc})"
+                        ) from exc
+                    backoff = min(
+                        POLL_BACKOFF_BASE_S * (2 ** (consecutive_errors - 1)),
+                        POLL_BACKOFF_MAX_S,
+                    )
+                    print(
+                        f"Poll transient error ({exc.__class__.__name__}): "
+                        f"retry {consecutive_errors}/{MAX_CONSECUTIVE_POLL_ERRORS} "
+                        f"in {backoff}s"
+                    )
+                    time.sleep(backoff)
+                    continue
+
+                consecutive_errors = 0
                 body = resp.json()
                 task_status = body.get("task_status", "unknown")
                 meta = body.get("task_meta") or {}
@@ -140,6 +179,17 @@ class LocalService:
                     progress.n = num_processed
                     progress.set_postfix(status=task_status)
                     progress.refresh()
+
+                now = time.monotonic()
+                if num_processed != last_num_processed:
+                    last_num_processed = num_processed
+                    last_progress_at = now
+                elif now - last_progress_at > NO_PROGRESS_TIMEOUT_S:
+                    raise LocalServiceError(
+                        f"Task {task_id}: no progress for "
+                        f"{NO_PROGRESS_TIMEOUT_S}s (stuck at "
+                        f"{num_processed}/{num_docs})"
+                    )
 
                 if task_status == "success":
                     if progress is not None:
