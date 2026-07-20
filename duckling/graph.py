@@ -10,7 +10,7 @@ from duckling.files.image import Image
 from duckling.files.text import Text
 from duckling.files.pdf.convert import PDF
 from duckling.files.pdf.draw import Draw
-from duckling.utils import is_a4, get_types_count
+from duckling.utils import is_standard_pdf_layout, get_types_count
 from duckling.state import State
 
 
@@ -37,6 +37,8 @@ class DucklingGraph:
         max_tokens: int = 4096,
         tokenizer: str = "sentence-transformers/all-MiniLM-L6-v2",
         llm: str = "gpt-4.1-nano",
+        page_size_tolerance: float = 8.0,
+        min_standard_page_ratio: float = 0.7,
     ):
         """Initialize the DucklingGraph.
 
@@ -44,10 +46,15 @@ class DucklingGraph:
             max_tokens: Token limit used by downstream converters.
             tokenizer: Tokenizer identifier.
             llm: LLM model name used by converters.
+            page_size_tolerance: Allowed page-size tolerance in points.
+            min_standard_page_ratio: Minimum share of standard pages
+                (A4/Letter) to route PDF to standard extraction.
         """
         self.max_tokens = max_tokens
         self.tokenizer = tokenizer
         self.llm = llm
+        self.page_size_tolerance = page_size_tolerance
+        self.min_standard_page_ratio = min_standard_page_ratio
         self.graph = self._compile()
 
     def _format_node(self, state: State) -> dict:
@@ -194,7 +201,15 @@ class DucklingGraph:
 
         graph.add_conditional_edges(
             "pdf",
-            lambda state: "standard" if is_a4(state["input"]) else "other",
+            lambda state: (
+                "standard"
+                if is_standard_pdf_layout(
+                    path=str(state["input"]),
+                    tol=self.page_size_tolerance,
+                    min_standard_page_ratio=self.min_standard_page_ratio,
+                )
+                else "other"
+            ),
             {"standard": "standard_pdf", "other": "drawing_pdf"},
         )
 

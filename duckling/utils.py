@@ -52,18 +52,46 @@ def create_source(path: str):
     return source
 
 
-def is_a4(path: str):
-    """Check whether a PDF file uses A4 page size within tolerance.
+def _matches_page_size(
+    width: float,
+    height: float,
+    target_width: float,
+    target_height: float,
+    tol: float,
+) -> bool:
+    """Return True when a page matches target size in portrait or landscape."""
+    portrait_ok = (
+        abs(width - target_width) <= tol and abs(height - target_height) <= tol
+    )
+    landscape_ok = (
+        abs(width - target_height) <= tol and abs(height - target_width) <= tol
+    )
+    return portrait_ok or landscape_ok
+
+
+def is_standard_pdf_layout(
+    path: str,
+    tol: float = 8.0,
+    min_standard_page_ratio: float = 0.7,
+) -> bool:
+    """Heuristic to decide if a PDF should go through standard text extraction.
+
+    A page is considered standard if it is close to A4 or US Letter
+    (portrait or landscape). The file is considered standard when at least
+    ``min_standard_page_ratio`` of its pages match one of these sizes.
 
     Args:
         path: Path to the PDF file.
+        tol: Allowed absolute tolerance on width/height in points.
+        min_standard_page_ratio: Minimum ratio of standard-size pages.
 
     Returns:
-        True if every page matches A4 dimensions (within tolerance), else False.
+        True if the PDF is mostly standard-size pages, else False.
     """
-    a4_width = 595
-    a4_height = 842
-    tol = 5
+    a4_width = 595.0
+    a4_height = 842.0
+    letter_width = 612.0
+    letter_height = 792.0
     try:
         doc = fitz.open(path)
     except Exception:
@@ -71,20 +99,32 @@ def is_a4(path: str):
     try:
         if doc.page_count == 0:
             return False
-        for p in doc:
-            width = p.rect.width
-            height = p.rect.height
-            portrait_ok = (
-                abs(width - a4_width) <= tol and abs(height - a4_height) <= tol
+
+        standard_pages = 0
+        for page in doc:
+            width = page.rect.width
+            height = page.rect.height
+            matches_a4 = _matches_page_size(width, height, a4_width, a4_height, tol)
+            matches_letter = _matches_page_size(
+                width, height, letter_width, letter_height, tol
             )
-            landscape_ok = (
-                abs(width - a4_height) <= tol and abs(height - a4_width) <= tol
-            )
-            if not (portrait_ok or landscape_ok):
-                return False
-        return True
+            if matches_a4 or matches_letter:
+                standard_pages += 1
+
+        ratio = standard_pages / doc.page_count
+        return ratio >= min_standard_page_ratio
     finally:
         doc.close()
+
+
+def is_a4(path: str):
+    """Backward compatible wrapper for older callers.
+
+    Historically this function required every page to be A4. It now reuses
+    the standard-layout heuristic to avoid misrouting normal US Letter PDFs
+    to drawing conversion.
+    """
+    return is_standard_pdf_layout(path=path)
 
 
 def get_types_count(documents: list[Document]) -> dict:
